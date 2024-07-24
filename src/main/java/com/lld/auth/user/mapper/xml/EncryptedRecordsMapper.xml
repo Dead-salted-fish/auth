@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lld.auth.user.mapper.EncryptedRecordsMapper">
+
+    <resultMap id="BaseResultMap" type="com.lld.auth.user.entity.EncryptedRecords">
+            <id property="id" column="id" jdbcType="BIGINT"/>
+            <result property="clientRsaPublickey" column="client_ras_publicKey" jdbcType="VARCHAR"/>
+            <result property="clientRsaPrivatekey" column="client_ras_privateKey" jdbcType="VARCHAR"/>
+            <result property="webRsaPublickey" column="web_ras_publicKey" jdbcType="VARCHAR"/>
+            <result property="webRsaPrivatekey" column="web_ras_privateKey" jdbcType="VARCHAR"/>
+            <result property="clientAesKey" column="client_aes_key" jdbcType="VARCHAR"/>
+            <result property="webAesKey" column="web_aes_key" jdbcType="VARCHAR"/>
+            <result property="createTime" column="create_time" jdbcType="TIMESTAMP"/>
+            <result property="updateTime" column="update_time" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id,client_rsa_publicKey,client_rsa_privateKey,
+        web_rsa_publicKey,web_rsa_privateKey,client_aes_key,
+        web_aes_key,type,status,create_time,update_time
+    </sql>
+
+    <insert id="addEncryptedRecord" parameterType="com.lld.auth.user.entity.EncryptedRecords">
+        insert into encrypted_records(client_rsa_publicKey,client_rsa_privateKey,web_aes_key,type,status,create_time,update_time)
+        values (#{encryptedRecords.clientRsaPublickey},
+                #{encryptedRecords.clientRsaPrivatekey},
+                #{encryptedRecords.webAesKey},
+                #{encryptedRecords.type},
+                #{encryptedRecords.status},
+                #{encryptedRecords.createTime},
+                #{encryptedRecords.updateTime}
+                )
+
+        <selectKey keyProperty="encryptedRecords.id" resultType="long" order="AFTER">
+            SELECT LAST_INSERT_ID()
+        </selectKey>
+    </insert>
+
+    <select id="selectLatestEncryptedRecord" resultType="com.lld.auth.user.entity.EncryptedRecords">
+         select <include refid="Base_Column_List"/>
+             from encrypted_records
+             where type = 0 and status = 1
+    </select>
+</mapper>
