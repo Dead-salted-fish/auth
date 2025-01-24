@@ -8,6 +8,7 @@ import com.lld.auth.user.service.SysUserService;
 import com.lld.auth.utils.*;
 import com.lld.saltedfishutils.utils.RedisUtils;
 import com.lld.saltedfishutils.utils.ReturnResult;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;

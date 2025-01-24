@@ -1,5 +1,6 @@
 package com.lld.auth.user.service;
 
+import com.lld.auth.user.entity.DTO.SysUserDto;
 import com.lld.auth.user.entity.SysUser;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.lld.saltedfishutils.utils.ReturnResult;
@@ -20,4 +21,18 @@ public interface SysUserService extends IService<SysUser> {
     void updateLoginDate(Long id, Date loginDate);
 
     ReturnResult getClientRsaPublicKey() throws Exception;
+
+    ReturnResult getMenus();
+
+    ReturnResult getUserList();
+
+    ReturnResult getUserRolesTree();
+
+    ReturnResult addUser(SysUserDto sysUserDto);
+
+    ReturnResult updateUser(SysUserDto sysUserDto);
+
+    ReturnResult getUserById(Long id);
+
+    ReturnResult deleteById(SysUserDto sysUserDto);
 }

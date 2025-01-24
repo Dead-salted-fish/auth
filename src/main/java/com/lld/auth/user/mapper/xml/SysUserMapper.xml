@@ -8,11 +8,14 @@
         <id property="id" column="id" jdbcType="BIGINT"/>
         <result property="userName" column="user_name" jdbcType="VARCHAR"/>
         <result property="passWord" column="pass_word" jdbcType="VARCHAR"/>
+        <result property="roles" column="roles" jdbcType="VARCHAR"/>
         <result property="avatar" column="avatar" jdbcType="VARCHAR"/>
         <result property="email" column="email" jdbcType="VARCHAR"/>
         <result property="phoneNumber" column="phone_number" jdbcType="VARCHAR"/>
         <result property="loginDate" column="login_date" jdbcType="TIMESTAMP"/>
         <result property="status" column="status" jdbcType="CHAR"/>
+        <result property="creater" column="creater" jdbcType="BIGINT"/>
+        <result property="updater" column="updater" jdbcType="BIGINT"/>
         <result property="createTime" column="create_time" jdbcType="TIMESTAMP"/>
         <result property="updateTime" column="update_time" jdbcType="TIMESTAMP"/>
         <result property="remark" column="remark" jdbcType="VARCHAR"/>
@@ -20,9 +23,9 @@
 
     <sql id="Base_Column_List">
         id
-        ,user_name,pass_word,encoder_type,
+        ,user_name,pass_word,roles,encoder_type,
         avatar,email,phone_number,
-        login_date,status,create_time,
+        login_date,status,creater,updater, create_time,
         update_time,remark
     </sql>
 
@@ -42,12 +45,16 @@
     </select>
 
     <insert id="insertSingle" parameterType="com.lld.auth.user.entity.SysUser">
-        insert into sys_user(user_name, pass_word, email, status, create_time, update_time, remark)
+        insert into sys_user(user_name, pass_word,roles, email,phone_number, status,creater,updater, create_time, update_time, remark)
         values (
                 #{sysUser.userName},
                 #{sysUser.passWord},
+                #{sysUser.roles},
                 #{sysUser.email},
+                #{sysUser.phoneNumber},
                 #{sysUser.status},
+                #{sysUser.creater},
+                #{sysUser.updater},
                 #{sysUser.createTime},
                 #{sysUser.updateTime},
                 #{sysUser.remark}
@@ -60,5 +67,19 @@
         set login_date = #{loginDate}
         where id = #{id}
     </update>
+
+    <update id="updateUserById"  parameterType="com.lld.auth.user.entity.SysUser">
+        update
+            sys_user
+        set user_name = #{sysUser.userName},
+            email = #{sysUser.email},
+            phone_number = #{sysUser.phoneNumber},
+            updater = #{sysUser.updater},
+            update_time = #{sysUser.updateTime},
+            roles = #{sysUser.roles},
+            status = #{sysUser.status}
+        where id = #{sysUser.id}
+    </update>
+
 
 </mapper>

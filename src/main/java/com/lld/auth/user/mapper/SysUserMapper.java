@@ -23,6 +23,8 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
     void insertSingle(@Param("sysUser") SysUser sysUser);
 
     void updateLoginDate(@Param("id")Long id, @Param("loginDate")Date loginDate);
+
+    int updateUserById(@Param("sysUser")SysUser sysUser);
 }
 
 

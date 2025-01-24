@@ -1,23 +1,27 @@
 package com.lld.auth.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lld.auth.security.PasswordEncoder.CustomPasswordEncoderFactories;
 import com.lld.auth.security.PasswordEncoder.RandomPasswordEncoder;
 import com.lld.auth.security.filter.CustomUsernamePasswordAuthenticationFilter;
+import com.lld.auth.security.filter.MyAuthenticationEntryPointFilter;
+import com.lld.auth.security.filter.MyAuthenticationFilter;
 import com.lld.auth.security.loginHandler.LoginFailureHandler;
 import com.lld.auth.security.loginHandler.LoginSuccessHandler;
 import com.lld.auth.security.userDetails.UserDetailsServiceImpl;
 import com.lld.auth.utils.EncrytedRecordHelper;
+import com.lld.saltedfishutils.utils.RedisUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-
+@DependsOn("multiConfigLoad")
 @Configuration
 public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
@@ -31,21 +35,39 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     private UserDetailsServiceImpl userDetailsService;
 
     @Autowired
+    private MyAuthenticationEntryPointFilter  authenticationEntryPointFilter;
+
+    @Autowired
     private EncrytedRecordHelper encrytedRecordHelper;
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Autowired
+    private  RedisUtils redisUtils;
+    //白名单
     private String[] URl_WHITELIST = {
             "/login",
             "/logout",
             "/hello",
             "/jx3/auth/user/register",
-            "/jx3/auth/user/login",
-            "/jx3/auth/user/getClientRsaPublicKey",
+            "/auth/user/login",
+            "/auth/user/getClientRsaPublicKey",
+            "/jx3/auth/user/getMenus",
     };
+
+
 
     @Bean
     public PasswordEncoder passwordEncoder() {
         RandomPasswordEncoder randomPasswordEncoder = CustomPasswordEncoderFactories.createRandomPasswordEncoder();
         return randomPasswordEncoder;
+    }
+
+
+    @Bean
+    public MyAuthenticationFilter myAuthenticationFilter() throws Exception {
+        return new MyAuthenticationFilter(authenticationManager(), redisUtils,objectMapper);
     }
 
     @Override
@@ -66,13 +88,19 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
         //登陆登出
          http.formLogin()
-                 .loginPage("/jx3/auth/user/login")
+                 .loginPage("/auth/user/login")
                  .successHandler(loginSuccessHandler)
                  .failureHandler(loginFailureHandler);
+        //异常处理
+        http.exceptionHandling()
+                .authenticationEntryPoint(authenticationEntryPointFilter);
 
 
         //拦截规则
         http.authorizeRequests().antMatchers(URl_WHITELIST).permitAll()
                 .anyRequest().authenticated();
+
+        //自定义过滤配置
+        http.addFilter(myAuthenticationFilter());
     }
 }

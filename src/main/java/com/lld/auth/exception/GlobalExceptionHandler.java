@@ -11,8 +11,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ReturnResult HandleException(Exception e) {
-        System.out.println("====");
-        System.out.println(e);
+        e.printStackTrace();
         return ReturnResult.error(e.getMessage());
     }
 
