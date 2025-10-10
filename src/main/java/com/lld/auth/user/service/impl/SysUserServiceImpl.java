@@ -1,33 +1,41 @@
 package com.lld.auth.user.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.lld.auth.redis.lua.LuaScriptManager;
 import com.lld.auth.security.entity.MyUsernamePasswordAuthenticationToken;
 import com.lld.auth.user.entity.DTO.SysUserDto;
 import com.lld.auth.user.entity.EncryptedRecords;
+import com.lld.auth.user.entity.OnlineStatistics;
 import com.lld.auth.user.entity.SysUser;
 import com.lld.auth.user.entity.VO.SysUserVo;
 import com.lld.auth.user.entity.WebMenu;
 import com.lld.auth.user.mapper.EncryptedRecordsMapper;
-import com.lld.auth.user.mapstruct.MSUserMapper;
-import com.lld.auth.user.service.SysMenuService;
-import com.lld.auth.user.service.SysUserService;
 import com.lld.auth.user.mapper.SysUserMapper;
+import com.lld.auth.user.mapstruct.MSUserMapper;
+import com.lld.auth.user.repository.SysUserRepository;
+import com.lld.auth.user.service.LuaOnlineUserService;
+import com.lld.auth.user.service.SysMenuService;
+import com.lld.auth.user.service.SysRoleService;
+import com.lld.auth.user.service.SysUserService;
+import com.lld.auth.utils.AuthPublicConstantKeys;
+import com.lld.auth.utils.SecurityUserUtils;
 import com.lld.saltedfishutils.entity.WebComponentVO.SelectOptionVO;
+import com.lld.saltedfishutils.utils.RedisUtils;
 import com.lld.saltedfishutils.utils.ReturnResult;
 import com.lld.saltedfishutils.utils.RsaUtil;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * @author saltedFish
@@ -35,8 +43,7 @@ import java.util.regex.Pattern;
  * @createDate 2024-03-20 15:45:56
  */
 @Service
-public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser>
-        implements SysUserService {
+public class SysUserServiceImpl implements SysUserService {
 
     private final SysUserMapper sysUserMapper;
 
@@ -48,11 +55,35 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser>
 
     private MSUserMapper msUserMapper = MSUserMapper.INSTANCE;
 
-    public SysUserServiceImpl(SysUserMapper sysUserMapper, EncryptedRecordsMapper encryptedRecordsMapper, PasswordEncoder passwordEncoder, SysMenuService sysMenuService) {
+    private SysRoleService sysRoleService;
+
+    private RedisUtils redisUtils;
+    // lua在线用户服务
+    private LuaOnlineUserService luaOnlineUserService;
+    // lua脚本管理器
+    private LuaScriptManager luaScriptManager;
+    // stringRedisTemplate
+    private StringRedisTemplate stringRedisTemplate;
+    //SysUserRepository
+    private SysUserRepository sysUserRepository;
+
+    private static final String DATE_PATTERN = "yyyy-MM-dd";
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern(DATE_PATTERN);
+
+    public SysUserServiceImpl(SysUserMapper sysUserMapper, EncryptedRecordsMapper encryptedRecordsMapper,
+                              PasswordEncoder passwordEncoder, SysMenuService sysMenuService, SysRoleService sysRoleService,
+                              RedisUtils redisUtils, LuaOnlineUserService luaOnlineUserService, LuaScriptManager luaScriptManager,
+                              StringRedisTemplate stringRedisTemplate, SysUserRepository sysUserRepository) {
         this.sysUserMapper = sysUserMapper;
         this.encryptedRecordsMapper = encryptedRecordsMapper;
         this.passwordEncoder = passwordEncoder;
         this.sysMenuService = sysMenuService;
+        this.sysRoleService = sysRoleService;
+        this.redisUtils = redisUtils;
+        this.luaOnlineUserService = luaOnlineUserService;
+        this.luaScriptManager = luaScriptManager;
+        this.stringRedisTemplate = stringRedisTemplate;
+        this.sysUserRepository = sysUserRepository;
     }
 
 
@@ -74,16 +105,19 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser>
         sysUser.setCreateTime(date);
         sysUser.setUpdateTime(date);
         sysUser.setRoles("3");
-
-        baseMapper.insertSingle(sysUser);
+        sysUserRepository.insertSingle(sysUser);
         return ReturnResult.OK();
     }
 
     @Override
     public void updateLoginDate(Long id, Date loginDate) {
-        baseMapper.updateLoginDate(id, loginDate);
+        sysUserRepository.updateLoginDate(id, loginDate);
+
     }
 
+    /**
+     * 获取加密公钥
+     * **/
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ReturnResult getClientRsaPublicKey() throws Exception {
@@ -119,37 +153,34 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser>
 
     @Override
     public ReturnResult getUserList() {
-        List<SysUser> sysUsers = baseMapper.selectList(null);
+        List<SysUser> sysUsers = sysUserRepository.selectList(null);
         List<SysUserVo> sysUserVos = new ArrayList<>();
+        Map<Long, String> rolesMap = sysRoleService.getRoleMap();
         for (SysUser sysUser : sysUsers) {
             SysUserVo sysUserVo = msUserMapper.SysUserToSysUserVo(sysUser);
+            //单独设置userName字段
             sysUserVo.setUserName(sysUser.getUsername());
-            String[] roleSplit = sysUser.getRoles().split(",");
-            StringBuilder roleBuilder = new StringBuilder();
-            for (String role : roleSplit) {
-                switch (role){
-                    case "1":
-                        roleBuilder.append("超级管理员").append(",");
-                        break;
-                    case "2":
-                        roleBuilder.append("管理员").append(",");
-                        break;
-                    case "3":
-                        roleBuilder.append("普通用户").append(",");
-                        break;
-                    case "4":
-                        roleBuilder.append("剑三er").append(",");
-                        break;
-                    case "5":
-                        roleBuilder.append("谋定天下er").append(",");
-                }
-            }
-            sysUserVo.setRolesStr(roleBuilder.substring(0,roleBuilder.length()-1).toString());
+            //设置角色名称
+            setSysUserVoSomeFields(rolesMap,sysUserVo);
 
             sysUserVos.add(sysUserVo);
         }
 
         return ReturnResult.OK(sysUserVos);
+    }
+    /**
+     * 对sysUserVo某些字段进行补充
+     * **/
+    public void setSysUserVoSomeFields(Map<Long, String> rolesMap ,SysUserVo sysUserVo){
+        String[] roleSplit = sysUserVo.getRoles().split(",");
+        StringBuilder roleBuilder = new StringBuilder();
+        for (String role : roleSplit) {
+            String roleName = rolesMap.get(Long.valueOf(role));
+            roleBuilder.append(roleName).append(",");
+        }
+        sysUserVo.setRolesStr(roleBuilder.substring(0,roleBuilder.length()-1).toString());
+        //设置状态名称
+        sysUserVo.setStatusStr(sysUserVo.getStatus().equals("1")?"正常":"禁用");
     }
 
     @Override
@@ -163,7 +194,6 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser>
 
         return ReturnResult.OK(selectOptionVOS);
     }
-
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ReturnResult addUser(SysUserDto sysUserDto) {
@@ -202,7 +232,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser>
 
     @Override
     public ReturnResult getUserById(Long id) {
-        SysUser sysUser = baseMapper.selectById(id);
+        SysUser sysUser = sysUserRepository.selectById(id);
         if(sysUser != null){
             SysUserVo sysUserVo = msUserMapper.SysUserToSysUserVo(sysUser);
             sysUserVo.setUserName(sysUser.getUsername());
@@ -214,13 +244,74 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser>
 
     @Override
     public ReturnResult deleteById(SysUserDto sysUserDto) {
-        QueryWrapper<SysUser> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("id",sysUserDto.getId());
-        int delete = baseMapper.delete(queryWrapper);
+
+        int delete = sysUserRepository.deleteById(sysUserDto.getId());
         if (delete == 0){
             return ReturnResult.error("未找到用户");
         }
         return ReturnResult.OK();
+    }
+
+    /**
+     * 根据用户id获取用户角色
+     * **/
+    @Override
+    public List<String> getRolesByUserId(Long userId) {
+        SysUser sysUser = sysUserMapper.selectById(userId);
+        List<Long> roleIds = Arrays.stream(sysUser.getRoles().split(",")).map(item -> Long.parseLong(item)).collect(Collectors.toList());
+        List<String> rolesById = sysRoleService.getRolesById(roleIds);
+        return rolesById;
+    }
+
+    /**
+     * 根据用户id获取用户详情
+     * */
+    @Override
+    public ReturnResult getUserDetailById(Long  userId) {
+        SysUser sysUser = sysUserMapper.selectById(userId);
+        SysUserVo sysUserVo = msUserMapper.SysUserToSysUserVo(sysUser);
+        sysUserVo.setUserName(sysUser.getUsername());
+        Map<Long, String> rolesMap = sysRoleService.getRoleMap();
+        setSysUserVoSomeFields(rolesMap,sysUserVo);
+        return ReturnResult.OK(sysUserVo);
+    }
+
+    @Override
+    public ReturnResult userHeartBeat(Long id, Integer status) {
+        Long userId = SecurityUserUtils.getCurrentUserId();
+        long currentTimeMillis = System.currentTimeMillis();
+        String todayOnlineBitmapKey = AuthPublicConstantKeys.TODAY_ONLINE_BITMAP_PREFIX+LocalDate.now().format(DATE_FORMATTER);
+
+        //获取三个key
+        List<String> keys = Arrays.asList(
+                AuthPublicConstantKeys.ONLINE_BITMAP_KEY,   //onlineBitmapKey 在线用户bitmap
+                AuthPublicConstantKeys.ACTIVITY_ZSET_KEY,  //activityZsetKey 活跃用户zset
+                todayOnlineBitmapKey
+        );
+
+        //登录脚本参数
+        String[] argv = {
+
+                String.valueOf(userId), //用户id
+                String.valueOf(currentTimeMillis),
+
+        };
+
+        RedisScript<List> userHeartbeatScript = luaScriptManager.getUserHeartbeatScript();
+
+        List<Object> result = (List<Object>) stringRedisTemplate.execute(
+                userHeartbeatScript,
+                keys, argv
+        );
+
+        return ReturnResult.OK(result);
+    }
+
+    @Override
+    public ReturnResult getOnlineStatistics() {
+        OnlineStatistics onlineStatistics = luaOnlineUserService.getOnlineStatistics();
+
+        return ReturnResult.OK(onlineStatistics);
     }
 
     private void checkRegisterUser(SysUser sysUser) {
@@ -244,7 +335,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser>
 
         }
         String username = sysUser.getUsername();
-        int countUserName = baseMapper.getCountUserName(username);
+        int countUserName = sysUserRepository.getCountUserName(username);
         if (countUserName > 0) {
             throw new RuntimeException("用户名已存在");
         }

@@ -61,6 +61,12 @@ public class SysUserVo {
     private String status;
 
     /**
+     * 帐号状态（1正常 0停用）
+     */
+
+    private String statusStr;
+
+    /**
      * 创建人
      */
     private Long creater;

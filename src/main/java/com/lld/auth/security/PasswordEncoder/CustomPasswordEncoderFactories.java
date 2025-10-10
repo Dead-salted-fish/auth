@@ -1,10 +1,8 @@
 package com.lld.auth.security.PasswordEncoder;
 
-import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.crypto.password.Pbkdf2PasswordEncoder;
-import org.springframework.security.crypto.scrypt.SCryptPasswordEncoder;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -25,7 +23,6 @@ public class CustomPasswordEncoderFactories {
         encoders.put("SHA-256",
                 new org.springframework.security.crypto.password.MessageDigestPasswordEncoder("SHA-256"));
         encoders.put("sha256", new org.springframework.security.crypto.password.StandardPasswordEncoder());
-        encoders.put("argon2", new Argon2PasswordEncoder());
         return new RandomPasswordEncoder(encoders);
     }
 }

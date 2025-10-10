@@ -19,7 +19,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         SysUser user = sysUserService.getUserByUserName(username);
         if(user == null){
-            throw new UsernameNotFoundException("用户名或密码错误");
+            throw new UsernameNotFoundException("没有此用户");
         }else if (user.getStatus().equals("0")){
             throw new UserAccountLockException("用户已被锁定");
         }

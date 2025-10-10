@@ -6,13 +6,14 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.lld.saltedfishutils.utils.ReturnResult;
 
 import java.util.Date;
+import java.util.List;
 
 /**
 * @author saltedFish
 * @description 针对表【sys_user】的数据库操作Service
 * @createDate 2024-03-20 15:45:56
 */
-public interface SysUserService extends IService<SysUser> {
+public interface SysUserService  {
 
     SysUser getUserByUserName(String username);
 
@@ -35,4 +36,12 @@ public interface SysUserService extends IService<SysUser> {
     ReturnResult getUserById(Long id);
 
     ReturnResult deleteById(SysUserDto sysUserDto);
+
+    List<String> getRolesByUserId(Long userId);
+
+    ReturnResult getUserDetailById(Long  id);
+
+    ReturnResult userHeartBeat(Long id, Integer status);
+
+    ReturnResult getOnlineStatistics();
 }

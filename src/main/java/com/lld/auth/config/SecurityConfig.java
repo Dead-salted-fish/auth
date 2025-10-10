@@ -5,33 +5,39 @@ import com.lld.auth.security.PasswordEncoder.CustomPasswordEncoderFactories;
 import com.lld.auth.security.PasswordEncoder.RandomPasswordEncoder;
 import com.lld.auth.security.filter.CustomUsernamePasswordAuthenticationFilter;
 import com.lld.auth.security.filter.MyAuthenticationEntryPointFilter;
-import com.lld.auth.security.filter.MyAuthenticationFilter;
+import com.lld.auth.security.filter.TokenAuthenticationFilter;
 import com.lld.auth.security.loginHandler.LoginFailureHandler;
 import com.lld.auth.security.loginHandler.LoginSuccessHandler;
 import com.lld.auth.security.userDetails.UserDetailsServiceImpl;
 import com.lld.auth.utils.EncrytedRecordHelper;
 import com.lld.saltedfishutils.utils.RedisUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.DependsOn;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-@DependsOn("multiConfigLoad")
+import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
+
+//@DependsOn("multiConfigLoad")
 @Configuration
 public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
     @Autowired
+    @Lazy
     private LoginSuccessHandler loginSuccessHandler;
 
     @Autowired
     private LoginFailureHandler loginFailureHandler;
 
-    @Autowired
+
     private UserDetailsServiceImpl userDetailsService;
 
     @Autowired
@@ -45,6 +51,14 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
     @Autowired
     private  RedisUtils redisUtils;
+    @Autowired
+    private ApplicationContext applicationContext;
+
+    @Autowired
+    @Lazy
+    public void setUserDetailsService(UserDetailsServiceImpl userDetailsService) {
+        this.userDetailsService = userDetailsService;
+    }
     //白名单
     private String[] URl_WHITELIST = {
             "/login",
@@ -58,21 +72,40 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
 
 
+
+
+
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         RandomPasswordEncoder randomPasswordEncoder = CustomPasswordEncoderFactories.createRandomPasswordEncoder();
         return randomPasswordEncoder;
     }
 
+    @Bean
+    public AuthenticationProvider daoAuthenticationProvider() {
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
+        provider.setUserDetailsService(userDetailsService);
+        provider.setPasswordEncoder(passwordEncoder());
+        provider.setHideUserNotFoundExceptions(false); // 关键配置
+        return provider;
+    }
+
+
 
     @Bean
-    public MyAuthenticationFilter myAuthenticationFilter() throws Exception {
-        return new MyAuthenticationFilter(authenticationManager(), redisUtils,objectMapper);
+    public TokenAuthenticationFilter tokenAuthenticationFilter() throws Exception {
+        return new TokenAuthenticationFilter(authenticationManager(), redisUtils,objectMapper);
     }
 
     @Override
     protected void configure(AuthenticationManagerBuilder auth) throws Exception {
-        auth.userDetailsService(userDetailsService);
+
+//        auth.userDetailsService(userDetailsService);
+
+        auth.authenticationProvider(daoAuthenticationProvider());
+
+
     }
 
     @Override
@@ -80,6 +113,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         http.cors().and().csrf().disable();
         //session禁用
         http.sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS);
+
         //自定义 登录过滤器
         CustomUsernamePasswordAuthenticationFilter myAuthenticationFilter = new CustomUsernamePasswordAuthenticationFilter(super.authenticationManagerBean(), encrytedRecordHelper);
         myAuthenticationFilter.setAuthenticationSuccessHandler(loginSuccessHandler);
@@ -91,8 +125,12 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                  .loginPage("/auth/user/login")
                  .successHandler(loginSuccessHandler)
                  .failureHandler(loginFailureHandler);
-        //异常处理
-        http.exceptionHandling()
+
+
+
+        //token处理以及异常处理
+        http.addFilterBefore(tokenAuthenticationFilter(), BasicAuthenticationFilter.class)
+                .exceptionHandling()
                 .authenticationEntryPoint(authenticationEntryPointFilter);
 
 
@@ -101,6 +139,47 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 .anyRequest().authenticated();
 
         //自定义过滤配置
-        http.addFilter(myAuthenticationFilter());
+//        http.addFilter(tokenAuthenticationFilter());
     }
 }
+
+//小巧思 ，通过迭代直接移除security 的验证filter,达到没有security的效果
+//    @Bean
+//    public ApplicationRunner filterOrderLogger() {
+//        FilterChainProxy filterChainProxy =   applicationContext.getBean(
+//                "springSecurityFilterChain", FilterChainProxy.class);
+//
+//        // 获取 filterChains 字段
+//        Field filterChainsField = null;
+//        try {
+//            filterChainsField = filterChainProxy.getClass().getDeclaredField("filterChains");
+//        } catch (NoSuchFieldException e) {
+//            throw new RuntimeException(e);
+//        }
+//
+//        // 设置字段可访问
+//        filterChainsField.setAccessible(true);
+//
+//        // 获取字段值
+//        @SuppressWarnings("unchecked")
+//        List<SecurityFilterChain> filterChains =
+//                null;
+//        try {
+//            filterChains = (List<SecurityFilterChain>) filterChainsField.get(filterChainProxy);
+//            for (SecurityFilterChain filterChain : filterChains) {
+//                List<Filter> filters = filterChain.getFilters();
+//                System.out.println(filters.getClass().getName());
+//                Iterator<Filter> iterator = filters.iterator();
+//                while (iterator.hasNext()){
+//                    iterator.next() ;
+//                    iterator.remove();
+//                }
+//                System.out.println("filters: " + filters);
+//            }
+//        } catch (IllegalAccessException e) {
+//            throw new RuntimeException(e);
+//        }
+//
+//
+//        return  null;
+//    }

@@ -20,11 +20,22 @@ public class MyAuthenticationEntryPointFilter implements AuthenticationEntryPoin
     }
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException authException) throws IOException, ServletException {
+        System.out.println("进入 MyAuthenticationEntryPointFilter ");
         response.setContentType("application/json;charset=utf-8");
+        response.setStatus(HttpServletResponse.SC_OK);
         ServletOutputStream outputStream = response.getOutputStream();
-        String result = objectMapper.writeValueAsString(ReturnResult.error(response.SC_UNAUTHORIZED, authException.getMessage()));
+
+        String errorMsg = (String) request.getAttribute("AUTH_ERROR_MSG");
+        if(errorMsg == null){
+            errorMsg = authException.getMessage() ;
+        }
+
+
+        String result = objectMapper.writeValueAsString(ReturnResult.error(response.SC_UNAUTHORIZED, errorMsg));
         outputStream.write(result.getBytes());
         outputStream.flush();
         outputStream.close();
     }
+
+
 }

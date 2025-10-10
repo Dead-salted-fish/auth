@@ -4,17 +4,14 @@ import java.security.SecureRandom;
 import java.util.Random;
 
 public class TokenGenerator {
-
-    private static final String ALPHABET_AND_DIGITS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    private static final byte[] ALPHABET_BYTES = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789".getBytes();
     private static final Random RANDOM = new SecureRandom();
 
     public static String generateToken() {
-        StringBuilder sb = new StringBuilder(20);
+        byte[] tokenBytes = new byte[20];
         for (int i = 0; i < 20; i++) {
-            int randomIndex = RANDOM.nextInt(ALPHABET_AND_DIGITS.length());
-            char randomChar = ALPHABET_AND_DIGITS.charAt(randomIndex);
-            sb.append(randomChar);
+            tokenBytes[i] = ALPHABET_BYTES[RANDOM.nextInt(62)];
         }
-        return sb.toString();
+        return new String(tokenBytes);
     }
 }

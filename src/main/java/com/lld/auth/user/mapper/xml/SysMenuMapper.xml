@@ -13,6 +13,7 @@
         <result property="path" column="path" jdbcType="VARCHAR"/>
         <result property="component" column="component" jdbcType="VARCHAR"/>
         <result property="menuType" column="menu_type" jdbcType="CHAR"/>
+        <result property="status" column="status" jdbcType="CHAR"/>
         <result property="perms" column="perms" jdbcType="VARCHAR"/>
         <result property="createTime" column="create_time" jdbcType="TIMESTAMP"/>
         <result property="updateTime" column="update_time" jdbcType="TIMESTAMP"/>
@@ -25,7 +26,7 @@
         id
         ,title,icon,
         parent_id,order_no,path,
-        component,menu_type,perms,
+        component,menu_type,status,perms,
         create_time,update_time,creater,
         updater,remark
     </sql>
@@ -39,8 +40,18 @@
             path        = #{sysMenu.path},
             component   = #{sysMenu.component},
             menu_type   = #{sysMenu.menuType},
+            status      = #{sysMenu.status},
             update_time = #{sysMenu.updateTime},
             updater     = #{sysMenu.updater}
         where id = #{sysMenu.id}
     </update>
+
+    <select id="selectByIds" parameterType="list" resultType="com.lld.auth.user.entity.SysMenu">
+        select
+        <include refid="Base_Column_List"/>
+        from sys_menu where id in
+        <foreach item="id" collection="list" separator="," open="(" close=")">
+            #{id}
+        </foreach>
+    </select>
 </mapper>

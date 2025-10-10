@@ -6,7 +6,9 @@ import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
 import java.util.Map;
-
+/**
+ * 密钥缓存，每次验证密码时候不用访问数据库获取私钥
+ * **/
 @Component
 public class EncrytedRecordHelper {
     private  Map<Long, EncryptedRecords> recordsMap = new HashMap<>();

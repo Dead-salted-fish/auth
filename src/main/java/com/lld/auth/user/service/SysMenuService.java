@@ -13,7 +13,7 @@ import java.util.List;
 * @description 针对表【sys_menu】的数据库操作Service
 * @createDate 2024-09-17 02:49:00
 */
-public interface SysMenuService extends IService<SysMenu> {
+public interface SysMenuService  {
 
     List<WebMenu> getUserMenus();
 
@@ -28,4 +28,10 @@ public interface SysMenuService extends IService<SysMenu> {
     ReturnResult updateMenu(SysMenuDto sysMenuDto);
 
     ReturnResult deleteMenuById(SysMenuDto sysMenuDto);
+
+    ReturnResult getMenuTree();
+
+    List<SysMenu> getMenuByIds(List<Long> menuIds);
+
+    ReturnResult getMenuDetailById(Long id);
 }

@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.List;
+
 /**
 * @author saltedFish
 * @description 针对表【sys_menu】的数据库操作Mapper
@@ -16,6 +18,8 @@ public interface SysMenuMapper extends BaseMapper<SysMenu> {
 
 
     int updateMenuById(@Param("sysMenu") SysMenu sysMenu);
+
+    List<SysMenu> selectByIds(List<Long> menuIds);
 }
 
 

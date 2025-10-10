@@ -27,6 +27,10 @@ public class SysMenuVo {
      * 父菜单ID
      */
     private Long parentId;
+    /**
+     * 父菜单名称
+     */
+    private String parentMenuStr;
 
     /**
      * 显示顺序
@@ -62,6 +66,11 @@ public class SysMenuVo {
      * 状态 (0 禁用 1启用)
      */
     private String status;
+
+    /**
+     * 状态 (0 禁用 1启用)
+     */
+    private String statusStr;
 
     /**
      * 创建时间

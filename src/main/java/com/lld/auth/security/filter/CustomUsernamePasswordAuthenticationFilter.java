@@ -15,10 +15,8 @@ import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
@@ -81,8 +79,10 @@ public class CustomUsernamePasswordAuthenticationFilter extends AbstractAuthenti
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+
         username = map.get("username");
         password = map.get("password");
+        request.setAttribute("fromWebUsername", username);
 
         checkNecessaryParameters(username, password,encryptedAesKey,clientRsaId);
         username = username.trim();
@@ -90,6 +90,7 @@ public class CustomUsernamePasswordAuthenticationFilter extends AbstractAuthenti
         UsernamePasswordAuthenticationToken authRequest = new UsernamePasswordAuthenticationToken(username, password);
         // Allow subclasses to set the "details" property
         setDetails(request, authRequest);
+
         return this.getAuthenticationManager().authenticate(authRequest);
     }
 

@@ -1,10 +1,9 @@
 package com.lld.auth.user.mapstruct;
-import com.lld.auth.user.entity.*;
-import com.lld.auth.user.entity.DTO.SysMenuDto;
-import com.lld.auth.user.entity.VO.SysMenuVo;
+
+import com.lld.auth.user.entity.MenuMeta;
+import com.lld.auth.user.entity.SysMenu;
+import com.lld.auth.user.entity.WebMenu;
 import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
-import org.mapstruct.Named;
 import org.mapstruct.factory.Mappers;
 
 import java.util.List;
@@ -20,18 +19,5 @@ public interface MSWebMenuMapper {
 
     MenuMeta toMenuMeta(SysMenu sysMenu);
 
-    SysMenuVo sysMenuToSysMenuVo(SysMenu sysMenu);
 
-
-    SysMenu sysMenuDtoToSysMenu(SysMenuDto sysMenuDto);
-
-    @Named("getParentId")
-    default Long getParentId(List<Long> parentIdList) {
-        if (parentIdList != null && !parentIdList.isEmpty()) {
-            return parentIdList.get(parentIdList.size()-1);
-        }
-        return null;
-    }
-
-    SysMenu SysMenuDtoToSysMenu(SysMenuDto sysMenuDto);
 }
