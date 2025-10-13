@@ -32,6 +32,7 @@ public class TokenAuthenticationFilter extends BasicAuthenticationFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws IOException, ServletException, ServletException {
         String headerToken = request.getHeader("token");
+
         System.out.println("headerToken ===== :"+ headerToken);
         String redisUserTokenKey = PublicConstantKeys.Redis_User_Token_Prefix+headerToken;
         if (headerToken == null){

@@ -10,9 +10,10 @@
     </appender>
 
     <appender name="LOGIN_LOG_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>E:/MyProject/client/auth/logs/login.log</file>
-        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>E:/MyProject/client/auth/logs/login.%d{yyyy-MM-dd}.log</fileNamePattern>
+        <file>./logs/login/login.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>logs/login/login.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <maxFileSize>100MB</maxFileSize>
             <maxHistory>30</maxHistory>
         </rollingPolicy>
         <encoder>
@@ -24,6 +25,7 @@
 
     <logger name="com.lld.auth.utils.LoginLogUtil" level="INFO" additivity="false">
         <appender-ref ref="LOGIN_LOG_FILE"/>
+        <appender-ref ref="CONSOLE" />
     </logger>
 
     <!-- 定义日志级别和输出目的地 -->

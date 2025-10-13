@@ -8,6 +8,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @SpringBootApplication
 @EnableScheduling
 @EnableDiscoveryClient
+
 public class AuthApplication {
 
     public static void main(String[] args) {
