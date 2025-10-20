@@ -12,8 +12,8 @@ import com.lld.auth.utils.LoginLogUtil;
 import com.lld.auth.utils.AuthPublicConstantKeys;
 import com.lld.auth.utils.TokenGenerator;
 import com.lld.saltedfishutils.utils.PublicConstantKeys;
-import com.lld.saltedfishutils.utils.RedisUtils;
-import com.lld.saltedfishutils.utils.ReturnResult;
+import com.lld.saltedfishutils.redis.RedisUtil;
+import com.lld.saltedfishutils.web.result.ReturnResult;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.security.core.Authentication;
@@ -31,7 +31,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 /**
  * 登陆成功处理
@@ -42,7 +41,7 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
     //fastjosn
     private final ObjectMapper objectMapper;
     //redis工具
-    private final RedisUtils redisUtils;
+    private final RedisUtil redisUtil;
     //用户服务
     private SysUserService userService;
     //登陆日志工具
@@ -56,10 +55,10 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern(DATE_PATTERN);
 
 
-    public LoginSuccessHandler(ObjectMapper objectMapper, RedisUtils redisUtils, SysUserService userService,
+    public LoginSuccessHandler(ObjectMapper objectMapper, RedisUtil redisUtil, SysUserService userService,
                                LoginLogUtil loginLogUtil, LuaScriptManager luaScriptManager, StringRedisTemplate stringRedisTemplate) {
         this.objectMapper = objectMapper;
-        this.redisUtils = redisUtils;
+        this.redisUtil = redisUtil;
         this.userService = userService;
         this.loginLogUtil = loginLogUtil;
         this.luaScriptManager = luaScriptManager;

@@ -4,7 +4,7 @@ package com.lld.auth.aspect;
 import com.lld.auth.annotation.RequireRole;
 import com.lld.auth.security.entity.MyUsernamePasswordAuthenticationToken;
 import com.lld.auth.user.service.SysUserService;
-import com.lld.saltedfishutils.utils.ReturnResult;
+import com.lld.saltedfishutils.web.result.ReturnResult;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;

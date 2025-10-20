@@ -1,6 +1,6 @@
 package com.lld.auth.exception;
 
-import com.lld.saltedfishutils.utils.ReturnResult;
+import com.lld.saltedfishutils.web.result.ReturnResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;

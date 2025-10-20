@@ -2,9 +2,8 @@ package com.lld.auth.user.service;
 
 import com.lld.auth.user.entity.DTO.SysMenuDto;
 import com.lld.auth.user.entity.SysMenu;
-import com.baomidou.mybatisplus.extension.service.IService;
 import com.lld.auth.user.entity.WebMenu;
-import com.lld.saltedfishutils.utils.ReturnResult;
+import com.lld.saltedfishutils.web.result.ReturnResult;
 
 import java.util.List;
 

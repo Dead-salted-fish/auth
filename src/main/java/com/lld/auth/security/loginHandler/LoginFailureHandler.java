@@ -5,7 +5,7 @@ import com.lld.auth.redis.lua.LuaScriptManager;
 import com.lld.auth.security.entity.LoginLimit;
 import com.lld.auth.utils.LoginLogUtil;
 import com.lld.auth.utils.AuthPublicConstantKeys;
-import com.lld.saltedfishutils.utils.ReturnResult;
+import com.lld.saltedfishutils.web.result.ReturnResult;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.security.authentication.BadCredentialsException;

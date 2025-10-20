@@ -3,7 +3,7 @@ package com.lld.auth.user.controller;
 import com.lld.auth.annotation.RequireRole;
 import com.lld.auth.user.entity.DTO.SysMenuDto;
 import com.lld.auth.user.service.SysMenuService;
-import com.lld.saltedfishutils.utils.ReturnResult;
+import com.lld.saltedfishutils.web.result.ReturnResult;
 import org.springframework.web.bind.annotation.*;
 
 @RequestMapping("/auth/menu")

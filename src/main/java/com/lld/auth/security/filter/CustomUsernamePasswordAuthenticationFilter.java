@@ -2,8 +2,8 @@ package com.lld.auth.security.filter;
 
 import com.lld.auth.user.entity.EncryptedRecords;
 import com.lld.auth.utils.EncrytedRecordHelper;
-import com.lld.saltedfishutils.utils.AESUtils;
-import com.lld.saltedfishutils.utils.RsaUtil;
+import com.lld.saltedfishutils.crypto.AESUtil;
+import com.lld.saltedfishutils.crypto.RSAUtil;
 import org.springframework.lang.Nullable;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationServiceException;
@@ -102,12 +102,12 @@ public class CustomUsernamePasswordAuthenticationFilter extends AbstractAuthenti
     private  Map<String, String> decryptUserAndPassword(String username, String password,String webAesKey,String clientRsaId) throws Exception {
 
         EncryptedRecords clientRsaRecords = encrytedRecordHelper.getEncryptedRecords(Long.valueOf(clientRsaId));
-        byte[] bytes = RsaUtil.decryptByPrivateKey(Base64.getDecoder().decode(webAesKey), clientRsaRecords.getClientRsaPrivatekey());
+        byte[] bytes = RSAUtil.decryptByPrivateKey(Base64.getDecoder().decode(webAesKey), clientRsaRecords.getClientRsaPrivatekey());
         String  decryptWebAesKey = new String(bytes);
 
         Map<String, String> map = new HashMap<>();
-        map.put("username", AESUtils.decrypt(username, decryptWebAesKey));
-        map.put("password", AESUtils.decrypt(password, decryptWebAesKey));
+        map.put("username", AESUtil.decrypt(username, decryptWebAesKey));
+        map.put("password", AESUtil.decrypt(password, decryptWebAesKey));
         return map;
 
     }

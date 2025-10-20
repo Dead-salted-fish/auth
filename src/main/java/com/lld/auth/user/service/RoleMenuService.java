@@ -1,9 +1,7 @@
 package com.lld.auth.user.service;
 
 import com.lld.auth.user.entity.DTO.RoleMenuAssignmentDto;
-import com.lld.auth.user.entity.RoleMenu;
-import com.baomidou.mybatisplus.extension.service.IService;
-import com.lld.saltedfishutils.utils.ReturnResult;
+import com.lld.saltedfishutils.web.result.ReturnResult;
 
 /**
 * @author saltedFish

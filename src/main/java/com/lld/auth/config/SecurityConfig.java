@@ -10,7 +10,7 @@ import com.lld.auth.security.loginHandler.LoginFailureHandler;
 import com.lld.auth.security.loginHandler.LoginSuccessHandler;
 import com.lld.auth.security.userDetails.UserDetailsServiceImpl;
 import com.lld.auth.utils.EncrytedRecordHelper;
-import com.lld.saltedfishutils.utils.RedisUtils;
+import com.lld.saltedfishutils.redis.RedisUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -50,7 +50,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     private ObjectMapper objectMapper;
 
     @Autowired
-    private  RedisUtils redisUtils;
+    private RedisUtil redisUtil;
     @Autowired
     private ApplicationContext applicationContext;
 
@@ -95,7 +95,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
     @Bean
     public TokenAuthenticationFilter tokenAuthenticationFilter() throws Exception {
-        return new TokenAuthenticationFilter(authenticationManager(), redisUtils,objectMapper);
+        return new TokenAuthenticationFilter(authenticationManager(), redisUtil,objectMapper);
     }
 
     @Override

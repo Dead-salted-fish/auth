@@ -12,7 +12,7 @@ import com.lld.auth.user.service.SysMenuService;
 import com.lld.auth.utils.SecurityUserUtils;
 import com.lld.saltedfishutils.entity.WebComponentVO.TreeNodeVo;
 import com.lld.saltedfishutils.entity.WebComponentVO.TreeTreeNodeVo;
-import com.lld.saltedfishutils.utils.ReturnResult;
+import com.lld.saltedfishutils.web.result.ReturnResult;
 import org.springframework.stereotype.Service;
 
 import java.util.*;

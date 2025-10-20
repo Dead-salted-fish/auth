@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lld.auth.security.entity.MyUsernamePasswordAuthenticationToken;
 import com.lld.auth.user.entity.SysUser;
 import com.lld.saltedfishutils.utils.PublicConstantKeys;
-import com.lld.saltedfishutils.utils.RedisUtils;
+import com.lld.saltedfishutils.redis.RedisUtil;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -18,13 +18,13 @@ import java.io.IOException;
 import java.util.ArrayList;
 
 public class TokenAuthenticationFilter extends BasicAuthenticationFilter {
-    private RedisUtils redisUtils;
+    private RedisUtil redisUtil;
 
     private ObjectMapper objectMapper;
 
-    public TokenAuthenticationFilter(AuthenticationManager authticarionManager, RedisUtils redisUtil, ObjectMapper objectMapper) {
+    public TokenAuthenticationFilter(AuthenticationManager authticarionManager, RedisUtil redisUtil, ObjectMapper objectMapper) {
         super(authticarionManager);
-        this.redisUtils = redisUtil;
+        this.redisUtil = redisUtil;
         this.objectMapper = objectMapper;
 
     }
@@ -32,26 +32,25 @@ public class TokenAuthenticationFilter extends BasicAuthenticationFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws IOException, ServletException, ServletException {
         String headerToken = request.getHeader("token");
-
-        System.out.println("headerToken ===== :"+ headerToken);
-        String redisUserTokenKey = PublicConstantKeys.Redis_User_Token_Prefix+headerToken;
-        if (headerToken == null){
+        System.out.println("headerToken ===== :" + headerToken);
+        if (headerToken == null) {
             chain.doFilter(request, response);
             return;
         }
 
-            if (!redisUtils.exists(redisUserTokenKey)) {
-                // 关键修改：抛出带明确消息的异常
-              request.setAttribute("AUTH_ERROR_MSG", "token已失效");
-              throw   new BadCredentialsException("token已失效");
-            }
+        String redisUserTokenKey = PublicConstantKeys.Redis_User_Token_Prefix + headerToken;
+        if (!redisUtil.exists(redisUserTokenKey)) {
+            // 关键修改：抛出带明确消息的异常
+            request.setAttribute("AUTH_ERROR_MSG", "token已失效");
+            throw new BadCredentialsException("token已失效");
+        }
 
-            SysUser sysUser = objectMapper.convertValue(redisUtils.get(redisUserTokenKey), SysUser.class);
-            MyUsernamePasswordAuthenticationToken auth = new MyUsernamePasswordAuthenticationToken(
-                    sysUser.getUsername(), null, new ArrayList<>(), sysUser.getId());
-            SecurityContextHolder.getContext().setAuthentication(auth);
+        SysUser sysUser = objectMapper.convertValue(redisUtil.get(redisUserTokenKey), SysUser.class);
+        MyUsernamePasswordAuthenticationToken auth = new MyUsernamePasswordAuthenticationToken(
+                sysUser.getUsername(), null, new ArrayList<>(), sysUser.getId());
+        SecurityContextHolder.getContext().setAuthentication(auth);
 
-            chain.doFilter(request, response);
+        chain.doFilter(request, response);
 
     }
 }

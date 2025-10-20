@@ -1,7 +1,7 @@
 package com.lld.auth.security.filter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.lld.saltedfishutils.utils.ReturnResult;
+import com.lld.saltedfishutils.web.result.ReturnResult;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;

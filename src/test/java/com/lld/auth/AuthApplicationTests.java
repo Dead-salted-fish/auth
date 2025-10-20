@@ -11,10 +11,14 @@ class AuthApplicationTests {
 
     @Test
     void test() {
-        RandomPasswordEncoder randomPasswordEncoder1 = CustomPasswordEncoderFactories.createRandomPasswordEncoder();
-        System.out.println(randomPasswordEncoder1.encode("123465"));;
-        System.out.println(randomPasswordEncoder1.encode("123465"));;
-        System.out.println(randomPasswordEncoder1.encode("123465"));;
+//        RandomPasswordEncoder randomPasswordEncoder1 = CustomPasswordEncoderFactories.createRandomPasswordEncoder();
+//        System.out.println(randomPasswordEncoder1.encode("123465"));;
+//        System.out.println(randomPasswordEncoder1.encode("123465"));;
+//        System.out.println(randomPasswordEncoder1.encode("123465"));;
+        Long a = 200L;
+        Long b = 200L;
+        System.out.println(a.compareTo( b));
+
     }
 
 }

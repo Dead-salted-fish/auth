@@ -4,7 +4,7 @@ import com.lld.auth.annotation.RequireRole;
 import com.lld.auth.user.entity.DTO.SysUserDto;
 import com.lld.auth.user.entity.SysUser;
 import com.lld.auth.user.service.SysUserService;
-import com.lld.saltedfishutils.utils.ReturnResult;
+import com.lld.saltedfishutils.web.result.ReturnResult;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 @RequestMapping("/auth")

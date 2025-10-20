@@ -1,7 +1,7 @@
 package com.lld.auth.user.service;
 
 import com.lld.auth.user.entity.DTO.SysRoleDto;
-import com.lld.saltedfishutils.utils.ReturnResult;
+import com.lld.saltedfishutils.web.result.ReturnResult;
 
 import java.util.List;
 import java.util.Map;

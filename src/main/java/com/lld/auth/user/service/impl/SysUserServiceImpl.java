@@ -1,6 +1,5 @@
 package com.lld.auth.user.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.lld.auth.redis.lua.LuaScriptManager;
 import com.lld.auth.security.entity.MyUsernamePasswordAuthenticationToken;
 import com.lld.auth.user.entity.DTO.SysUserDto;
@@ -20,9 +19,9 @@ import com.lld.auth.user.service.SysUserService;
 import com.lld.auth.utils.AuthPublicConstantKeys;
 import com.lld.auth.utils.SecurityUserUtils;
 import com.lld.saltedfishutils.entity.WebComponentVO.SelectOptionVO;
-import com.lld.saltedfishutils.utils.RedisUtils;
-import com.lld.saltedfishutils.utils.ReturnResult;
-import com.lld.saltedfishutils.utils.RsaUtil;
+import com.lld.saltedfishutils.redis.RedisUtil;
+import com.lld.saltedfishutils.web.result.ReturnResult;
+import com.lld.saltedfishutils.crypto.RSAUtil;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -57,7 +56,7 @@ public class SysUserServiceImpl implements SysUserService {
 
     private SysRoleService sysRoleService;
 
-    private RedisUtils redisUtils;
+    private RedisUtil redisUtil;
     // lua在线用户服务
     private LuaOnlineUserService luaOnlineUserService;
     // lua脚本管理器
@@ -72,14 +71,14 @@ public class SysUserServiceImpl implements SysUserService {
 
     public SysUserServiceImpl(SysUserMapper sysUserMapper, EncryptedRecordsMapper encryptedRecordsMapper,
                               PasswordEncoder passwordEncoder, SysMenuService sysMenuService, SysRoleService sysRoleService,
-                              RedisUtils redisUtils, LuaOnlineUserService luaOnlineUserService, LuaScriptManager luaScriptManager,
+                              RedisUtil redisUtil, LuaOnlineUserService luaOnlineUserService, LuaScriptManager luaScriptManager,
                               StringRedisTemplate stringRedisTemplate, SysUserRepository sysUserRepository) {
         this.sysUserMapper = sysUserMapper;
         this.encryptedRecordsMapper = encryptedRecordsMapper;
         this.passwordEncoder = passwordEncoder;
         this.sysMenuService = sysMenuService;
         this.sysRoleService = sysRoleService;
-        this.redisUtils = redisUtils;
+        this.redisUtil = redisUtil;
         this.luaOnlineUserService = luaOnlineUserService;
         this.luaScriptManager = luaScriptManager;
         this.stringRedisTemplate = stringRedisTemplate;
@@ -128,7 +127,7 @@ public class SysUserServiceImpl implements SysUserService {
             return ReturnResult.OK(latestRecored);
         }
         //生成客户端RSA公钥私钥
-        Map<String, String> rsaMap = RsaUtil.genKeyPair();
+        Map<String, String> rsaMap = RSAUtil.genKeyPair();
         //保存到数据库
         EncryptedRecords encryptedRecords = new EncryptedRecords();
         encryptedRecords.setClientRsaPublickey(rsaMap.get("publicKey"));
