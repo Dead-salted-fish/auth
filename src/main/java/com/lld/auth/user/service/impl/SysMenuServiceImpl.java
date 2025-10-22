@@ -2,12 +2,14 @@ package com.lld.auth.user.service.impl;
 
 import com.lld.auth.user.entity.DTO.SysMenuDto;
 import com.lld.auth.user.entity.MenuMeta;
+import com.lld.auth.user.entity.RoleMenu;
 import com.lld.auth.user.entity.SysMenu;
 import com.lld.auth.user.entity.VO.SysMenuVo;
 import com.lld.auth.user.entity.WebMenu;
 import com.lld.auth.user.mapstruct.MSSysMenuMapper;
 import com.lld.auth.user.mapstruct.MSWebMenuMapper;
 import com.lld.auth.user.repository.SysMenuRepository;
+import com.lld.auth.user.service.RoleMenuService;
 import com.lld.auth.user.service.SysMenuService;
 import com.lld.auth.utils.SecurityUserUtils;
 import com.lld.saltedfishutils.entity.WebComponentVO.TreeNodeVo;
@@ -34,8 +36,12 @@ public class    SysMenuServiceImpl implements SysMenuService{
 
     private final SysMenuRepository sysMenuRepository;
 
-    public SysMenuServiceImpl(SysMenuRepository sysMenuRepository) {
+    private final RoleMenuService roleMenuService;
+
+    public SysMenuServiceImpl(SysMenuRepository sysMenuRepository, RoleMenuService roleMenuService) {
         this.sysMenuRepository = sysMenuRepository;
+        this.roleMenuService = roleMenuService;
+
     }
 
     /***
@@ -43,8 +49,10 @@ public class    SysMenuServiceImpl implements SysMenuService{
      **/
     @Override
     public List<WebMenu> getUserMenus() {
+        List<RoleMenu> menusByRoleId = roleMenuService.getMenuIdsByRoleId(SecurityUserUtils.getCurrentUserId());
+        List<Long> collect = menusByRoleId.stream().map(RoleMenu::getMenuId).distinct().collect(Collectors.toList());
         // 获取用户菜单并且分组
-        List<SysMenu> userMenus = sysMenuRepository.selectList(null);
+        List<SysMenu> userMenus = sysMenuRepository.selectByIds(collect);
         if (userMenus == null || userMenus.isEmpty()) return new ArrayList<>();
 
 

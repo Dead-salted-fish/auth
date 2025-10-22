@@ -1,7 +1,10 @@
 package com.lld.auth.user.service;
 
 import com.lld.auth.user.entity.DTO.RoleMenuAssignmentDto;
+import com.lld.auth.user.entity.RoleMenu;
 import com.lld.saltedfishutils.web.result.ReturnResult;
+
+import java.util.List;
 
 /**
 * @author saltedFish
@@ -12,7 +15,9 @@ public interface RoleMenuService {
 
     ReturnResult updateRoleMenu(RoleMenuAssignmentDto roleMenuAssignmentDto);
 
-    ReturnResult getMenuIdsByRoleId(Long roleId);
+    List<RoleMenu> getMenuIdsByRoleId(Long roleId);
+
+    ReturnResult getRoleMenuIdsGroupedByType(Long roleId);
 
     ReturnResult getRoleOwnedMenuTreeByRoleId(Long roleId);
 

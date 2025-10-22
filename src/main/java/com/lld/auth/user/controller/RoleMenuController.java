@@ -25,7 +25,7 @@ public class RoleMenuController {
      * */
     @GetMapping("/getMenuIdsByRoleId")
     public ReturnResult getMenuIdsByRoleId(@RequestParam("roleId") Long roleId) {
-        return sysMenuService.getMenuIdsByRoleId(roleId);
+        return sysMenuService.getRoleMenuIdsGroupedByType(roleId);
     }
 
     @GetMapping("/getRoleOwnedMenuTreeByRoleId")

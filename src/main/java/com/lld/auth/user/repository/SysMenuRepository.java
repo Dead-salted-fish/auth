@@ -35,6 +35,6 @@ public class SysMenuRepository {
     }
 
     public List<SysMenu> selectByIds(List<Long> menuIds) {
-        return sysMenuMapper.selectBatchIds(menuIds);
+        return sysMenuMapper.selectByIds(menuIds);
     }
 }
