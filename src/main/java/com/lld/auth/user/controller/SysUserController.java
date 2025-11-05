@@ -86,6 +86,7 @@ public class SysUserController {
 
     /**
      * 用户心跳，更新用户状态
+     * roles = {"noAuthentication"} 表示不需要权限，但还是要登录的
      * */
     @RequireRole(roles = {"noAuthentication"})
     @GetMapping("/user/userHeartBeat")

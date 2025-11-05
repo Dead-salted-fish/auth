@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lld.auth.user.mapper.RoleMenuMapper">
+
+    <resultMap id="BaseResultMap" type="com.lld.auth.user.entity.RoleMenu">
+        <id property="id" column="id" jdbcType="BIGINT"/>
+        <result property="roleId" column="role_id" jdbcType="BIGINT"/>
+        <result property="role" column="role" jdbcType="VARCHAR"/>
+        <result property="menuId" column="menu_id" jdbcType="BIGINT"/>
+        <result property="menuTitle" column="menu_title" jdbcType="VARCHAR"/>
+        <result property="menuType" column="menu_type" jdbcType="VARCHAR"/>
+        <result property="createTime" column="create_time" jdbcType="TIMESTAMP"/>
+        <result property="updateTime" column="update_time" jdbcType="TIMESTAMP"/>
+        <result property="creater" column="creater" jdbcType="BIGINT"/>
+        <result property="updater" column="updater" jdbcType="BIGINT"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id
+        ,role_id,role,
+        menu_id,menu_title,menu_type,create_time,
+        update_time,creater,updater
+    </sql>
+
+    <delete id="deleteByRoleId" parameterType="long">
+        delete
+        from role_menu
+        where role_id = #{roleId}
+    </delete>
+
+    <insert id="insertRoleMenus" parameterType="list">
+        insert into role_menu(role_id,role,menu_id,menu_title,menu_type,create_time,update_time,creater,updater) values
+        <foreach item="item" collection="list" separator=",">
+            (
+            #{item.roleId},
+            #{item.role},
+            #{item.menuId},
+            #{item.menuTitle},
+            #{item.menuType},
+            #{item.createTime},
+            #{item.updateTime},
+            #{item.creater},
+            #{item.updater}
+            )
+        </foreach>
+    </insert>
+
+    <select id="selectByRoleId" parameterType="long" resultType="com.lld.auth.user.entity.RoleMenu">
+        select
+        <include refid="Base_Column_List"/>
+        from role_menu where role_id = #{roleId}
+    </select>
+</mapper>

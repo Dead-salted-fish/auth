@@ -3,8 +3,8 @@ package com.lld.auth.security.filter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lld.auth.security.entity.MyUsernamePasswordAuthenticationToken;
 import com.lld.auth.user.entity.SysUser;
-import com.lld.saltedfishutils.utils.PublicConstantKeys;
 import com.lld.saltedfishutils.redis.RedisUtil;
+import com.lld.saltedfishutils.utils.PublicConstantKeys;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -15,7 +15,9 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 
 public class TokenAuthenticationFilter extends BasicAuthenticationFilter {
     private RedisUtil redisUtil;
@@ -32,7 +34,7 @@ public class TokenAuthenticationFilter extends BasicAuthenticationFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws IOException, ServletException, ServletException {
         String headerToken = request.getHeader("token");
-        System.out.println("headerToken ===== :" + headerToken);
+        System.out.println(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date())+"headerToken ===== :" + headerToken);
         if (headerToken == null) {
             chain.doFilter(request, response);
             return;
