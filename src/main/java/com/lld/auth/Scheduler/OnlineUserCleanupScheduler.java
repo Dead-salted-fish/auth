@@ -24,7 +24,7 @@ public class OnlineUserCleanupScheduler {
 
     private static final Logger logger = LoggerFactory.getLogger(OnlineUserCleanupScheduler.class);
     /**
-     * 每5分钟执行一次清理
+     * 每30分钟执行一次清理
      */
     @Scheduled(fixedRate = 1800000)
     public void scheduledCleanup() {
