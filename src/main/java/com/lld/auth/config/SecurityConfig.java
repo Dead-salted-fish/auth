@@ -110,9 +110,25 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
     @Override
     protected void configure(HttpSecurity http) throws Exception {
+
+        // 禁用默认表单登录
+        http.formLogin().disable();
+        // 启用 CORS（跨域资源共享）支持，禁用 CSRF（跨站请求伪造）保护机制
         http.cors().and().csrf().disable();
-        //session禁用
-        http.sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS);
+        // 禁用 HTTP Basic
+        http.httpBasic().disable();
+        //// 禁用默认注销端点
+        http.logout().disable();
+        // 禁用默认的会话管理
+        http.sessionManagement().disable();
+        // 禁用记住我
+        http.rememberMe().disable();
+        // 不能禁用匿名访问，否则白名单失效，FilterSecurityInterceptor 需要一个用户验证权限，匿名访问在没有用户的时候创建一个匿名用户
+//        http.anonymous().disable();
+
+
+//        //session禁用
+//        http.sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS);
 
         //自定义 登录过滤器
         CustomUsernamePasswordAuthenticationFilter myAuthenticationFilter = new CustomUsernamePasswordAuthenticationFilter(super.authenticationManagerBean(), encrytedRecordHelper);
@@ -120,11 +136,13 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         myAuthenticationFilter.setAuthenticationFailureHandler(loginFailureHandler);
         http.addFilterAt(myAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
+//        //登陆登出
+//         http.formLogin()
+//                 .loginPage("/auth/user/login")
+//                 .successHandler(loginSuccessHandler)
+//                 .failureHandler(loginFailureHandler);
         //登陆登出
-         http.formLogin()
-                 .loginPage("/auth/user/login")
-                 .successHandler(loginSuccessHandler)
-                 .failureHandler(loginFailureHandler);
+        http.formLogin().disable();
 
 
 
