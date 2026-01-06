@@ -93,11 +93,6 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
 
 
-    @Bean
-    public TokenAuthenticationFilter tokenAuthenticationFilter() throws Exception {
-        return new TokenAuthenticationFilter(authenticationManager(), redisUtil,objectMapper);
-    }
-
     @Override
     protected void configure(AuthenticationManagerBuilder auth) throws Exception {
 
@@ -144,10 +139,10 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         //登陆登出
         http.formLogin().disable();
 
-
+        TokenAuthenticationFilter tokenAuthenticationFilter = new TokenAuthenticationFilter(authenticationManager(), redisUtil, objectMapper);
 
         //token处理以及异常处理
-        http.addFilterBefore(tokenAuthenticationFilter(), BasicAuthenticationFilter.class)
+        http.addFilterBefore(tokenAuthenticationFilter, BasicAuthenticationFilter.class)
                 .exceptionHandling()
                 .authenticationEntryPoint(authenticationEntryPointFilter);
 

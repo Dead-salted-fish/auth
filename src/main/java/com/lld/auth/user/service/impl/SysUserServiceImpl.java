@@ -219,6 +219,10 @@ public class SysUserServiceImpl implements SysUserService {
         MyUsernamePasswordAuthenticationToken authentication = (MyUsernamePasswordAuthenticationToken)SecurityContextHolder.getContext().getAuthentication();
         Long userId = authentication.getUserId();
         SysUser sysUser = msUserMapper.SysUserDtoToSysUser(sysUserDto);
+        Boolean superAdmin = Arrays.asList(sysUser.getRoles().split(",")).contains("1");
+        if(superAdmin){
+            throw new RuntimeException("用户暂时不能赋予超级管理员权限");
+        }
         sysUser.setUpdater(userId);
         Date now = new Date();
         sysUser.setUpdateTime(now);

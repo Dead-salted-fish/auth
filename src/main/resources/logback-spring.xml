@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<configuration>
+<configuration >
 
+    <!-- 定义日志格式 -->
+    <property name="APP_NAME" value="auth"/>
+    <property name="LOGSTASH_ENABLED" value="${LOGSTASH_ENABLED:-false}"/>
     <!-- 输出到控制台 -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
@@ -9,6 +12,20 @@
         </encoder>
     </appender>
 
+    <!-- 通用请求日志 -->
+    <appender name="NORMAL_LOG" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>./logs/auth/request.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>logs/auth/request.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <maxFileSize>100MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{YYYY-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!--   登录日志-->
     <appender name="LOGIN_LOG_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>./logs/login/login.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
@@ -20,17 +37,103 @@
             <pattern>%date %level [%thread] %logger{10} [%file:%line] %msg%n</pattern>
         </encoder>
     </appender>
+    <if condition='property("LOGSTASH_ENABLED").equals("true")'>
+            <then>
+        <!-- Logstash TCP 输出 -->
+        <appender name="LOGSTASH_TCP" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+            <!-- Logstash 服务器地址 -->
+            <destination>127.0.0.1:5000</destination>
+            <!-- 连接重试策略 -->
+            <reconnectionDelay>5000</reconnectionDelay>
+            <!-- Keep-Alive -->
+            <keepAliveDuration>5 minutes</keepAliveDuration>
+            <!-- 编码器 -->
+            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                <!-- 自定义字段 -->
+                <customFields>{"appName":"${APP_NAME}","environment":"${spring.profiles.active:-default}"}
+                </customFields>
+                <!-- 时间戳格式 -->
+                <timestampPattern>yyyy-MM-dd HH:mm:ss.SSSZ</timestampPattern>
+                <!-- 包含 MDC -->
+                <includeMdc>true</includeMdc>
+                <!-- 排除默认字段 -->
+                <fieldNames>
+                    <timestamp>@timestamp</timestamp>
+                    <message>message</message>
+                    <thread>thread</thread>
+                    <logger>logger</logger>
+                    <version>[ignore]</version>
+                    <levelValue>[ignore]</levelValue>
+                </fieldNames>
+                <!-- 包含调用者信息 -->
+                <includeCallerData>true</includeCallerData>
+            </encoder>
+        </appender>
 
+        <!-- 异步 Logstash 输出（提高性能） -->
+        <appender name="ASYNC_LOGSTASH" class="ch.qos.logback.classic.AsyncAppender">
+            <appender-ref ref="LOGSTASH_TCP"/>
+            <queueSize>1024</queueSize>
+            <discardingThreshold>0</discardingThreshold>
+            <includeCallerData>true</includeCallerData>
+            <neverBlock>true</neverBlock>
+        </appender>
+            </then>
 
+    </if>
 
-    <logger name="com.lld.auth.utils.LoginLogUtil" level="INFO" additivity="false">
+    <!-- 通用请求日志 - 异步 -->
+    <appender name="ASYNC_NORMAL_LOG" class="ch.qos.logback.classic.AsyncAppender">
+        <!-- 不丢失日志（0=不丢弃，推荐） -->
+        <discardingThreshold>0</discardingThreshold>
+        <!-- 队列大小，根据内存调整 -->
+        <queueSize>4096</queueSize>
+        <!-- 是否包含调用者信息（影响性能） -->
+        <includeCallerData>false</includeCallerData>
+        <!-- 从不阻塞生产者 -->
+        <neverBlock>true</neverBlock>
+        <!-- 最大刷新时间（毫秒） -->
+        <maxFlushTime>500</maxFlushTime>
+        <!-- 引用实际的 Appender -->
+        <appender-ref ref="NORMAL_LOG"/>
+    </appender>
+
+    <!-- 用户心跳日志 - 异步 -->
+    <appender name="ASYNC_LOGIN_LOG_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <discardingThreshold>0</discardingThreshold>
+        <queueSize>4096</queueSize>
+        <includeCallerData>false</includeCallerData>
+        <neverBlock>true</neverBlock>
+        <maxFlushTime>500</maxFlushTime>
         <appender-ref ref="LOGIN_LOG_FILE"/>
-        <appender-ref ref="CONSOLE" />
-    </logger>
+    </appender>
+
+
+
+            <logger name="normalLog" level="INFO" additivity="false">
+                <appender-ref ref="ASYNC_NORMAL_LOG"/>
+                <appender-ref ref="CONSOLE"/>
+                <if condition='property("LOGSTASH_ENABLED").equals("true")'>
+                    <then>
+                <appender-ref ref="ASYNC_LOGSTASH"/>
+                    </then>
+                </if>
+            </logger>
+
+            <logger name="loginLog" level="INFO" additivity="false">
+                <appender-ref ref="ASYNC_LOGIN_LOG_FILE"/>
+                <appender-ref ref="CONSOLE"/>
+                <if condition='property("LOGSTASH_ENABLED").equals("true")'>
+                    <then>
+                        <appender-ref ref="ASYNC_LOGSTASH"/>
+                    </then>
+                </if>
+            </logger>
+
 
     <!-- 定义日志级别和输出目的地 -->
     <root level="info">
-        <appender-ref ref="CONSOLE" />
+        <appender-ref ref="CONSOLE"/>
     </root>
 </configuration>
 
