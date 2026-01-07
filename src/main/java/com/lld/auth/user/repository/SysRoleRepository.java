@@ -2,11 +2,11 @@ package com.lld.auth.user.repository;
 
 import com.lld.auth.user.entity.SysRole;
 import com.lld.auth.user.mapper.SysRoleMapper;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
-@Component
+@Repository
 public class SysRoleRepository {
     private SysRoleMapper sysRoleMapper;
     public SysRoleRepository(SysRoleMapper sysRoleMapper) {

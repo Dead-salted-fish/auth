@@ -3,12 +3,12 @@ package com.lld.auth.user.repository;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.lld.auth.user.entity.SysUser;
 import com.lld.auth.user.mapper.SysUserMapper;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Repository;
 
 import java.util.Date;
 import java.util.List;
 
-@Component
+@Repository
 public class SysUserRepository {
     private SysUserMapper sysUserMapper;
     public SysUserRepository(SysUserMapper sysUserMapper) {
