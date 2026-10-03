@@ -1,6 +1,7 @@
 package com.lld.auth.user.service;
 
 import com.lld.auth.user.entity.DTO.SysRoleDto;
+import com.lld.auth.user.entity.SysRole;
 import com.lld.saltedfishutils.web.result.ReturnResult;
 
 import java.util.List;
@@ -30,4 +31,6 @@ public interface SysRoleService  {
     Map<Long, String> getRoleMap();
 
     ReturnResult getRoleDetailById(Long roleId);
+
+    List<SysRole> getAllRoles();
 }

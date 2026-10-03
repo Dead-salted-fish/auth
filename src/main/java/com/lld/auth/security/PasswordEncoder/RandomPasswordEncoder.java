@@ -19,24 +19,21 @@ public class RandomPasswordEncoder implements PasswordEncoder {
     @Override
     public String encode(CharSequence charSequence) {
 
-        List<String> encoderTypes = new ArrayList<>();
-        for (String type : passwordEncoderMap.keySet()) {
-            encoderTypes.add(type);
-        }
-
-        Random random = new Random();
-        int i = random.nextInt(encoderTypes.size());
-        String encoderType = encoderTypes.get(i);
-        String passWordEncoded = passwordEncoderMap.get(encoderTypes.get(i)).encode(charSequence);
+       // 现在固定使用 bcrypt 加密器
+        String encoderType = "bcrypt";
+        String passWordEncoded = passwordEncoderMap.get(encoderType).encode(charSequence);
 
         return PREFIX + encoderType + SUFFIX+passWordEncoded;
     }
 
     @Override
     public boolean matches(CharSequence rawPassword, String prefixEncodedPassword) {
+
         if (rawPassword == null && prefixEncodedPassword == null) {
             return true;
         }
+        // 获取加密器类型
+        // 为了和历史版本兼容，以前是随机加密方式，现在只有 bcrypt 加密器
         String id = extractId(prefixEncodedPassword);
         PasswordEncoder passwordEncoder = this.passwordEncoderMap.get(id);
         if (passwordEncoder == null) {
@@ -61,6 +58,7 @@ public class RandomPasswordEncoder implements PasswordEncoder {
         return prefixEncodedPassword.substring(start + 1, end);
     }
 
+    // 密码平滑升级
     @Override
     public boolean upgradeEncoding(String prefixEncodedPassword) {
         String id = extractId(prefixEncodedPassword);

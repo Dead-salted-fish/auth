@@ -5,6 +5,7 @@ import com.lld.auth.annotation.RequireRole;
 import com.lld.auth.security.entity.MyUsernamePasswordAuthenticationToken;
 import com.lld.auth.user.service.SysUserService;
 import com.lld.saltedfishutils.web.result.ReturnResult;
+import jakarta.servlet.http.HttpServletRequest;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -12,7 +13,7 @@ import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
-import javax.servlet.http.HttpServletRequest;
+
 import java.util.List;
 
 @Aspect
@@ -34,6 +35,7 @@ public class RoleAspect {
         RequireRole methodAnnotation = ((MethodSignature) joinPoint.getSignature())
                 .getMethod()
                 .getAnnotation(RequireRole.class);
+
 
         // 获取类上的注解
         RequireRole classAnnotation = joinPoint.getTarget().getClass()

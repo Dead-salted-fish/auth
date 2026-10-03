@@ -1,6 +1,200 @@
-<html>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>❤️ 致最爱的杨婷</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            position: relative;
+        }
+
+        /* 爱心粒子画布 */
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 0;
+        }
+
+        /* 主文字容器 */
+        .content {
+            z-index: 10;
+            text-align: center;
+            padding: 0 20px;
+            animation: fadeInUp 1.5s ease-out;
+        }
+
+        .heart-icon {
+            font-size: 60px;
+            animation: heartbeat 1.2s ease-in-out infinite;
+            margin-bottom: 20px;
+            filter: drop-shadow(0 0 15px rgba(255, 107, 107, 0.8));
+        }
+
+        .main-text {
+            font-size: clamp(28px, 8vw, 48px);
+            color: #fff;
+            font-weight: 700;
+            letter-spacing: 4px;
+            text-shadow: 0 0 20px rgba(255, 107, 107, 0.9),
+            0 0 40px rgba(255, 107, 107, 0.5);
+            line-height: 1.6;
+            min-height: 1.6em;
+        }
+
+        .sub-text {
+            margin-top: 24px;
+            font-size: clamp(14px, 4vw, 18px);
+            color: rgba(255, 255, 255, 0.7);
+            letter-spacing: 2px;
+            opacity: 0;
+            animation: fadeIn 2s ease-out 2.5s forwards;
+        }
+
+        /* 点击涟漪效果 */
+        .ripple {
+            position: absolute;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255,107,107,0.6) 0%, transparent 70%);
+            transform: scale(0);
+            animation: rippleAnim 0.8s ease-out forwards;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        @keyframes heartbeat {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.15); }
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+
+        @keyframes rippleAnim {
+            to { transform: scale(4); opacity: 0; }
+        }
+    </style>
+</head>
 <body>
-<h1>hello word!!!</h1>
-<p>this is a html page</p>
+<canvas id="heartCanvas"></canvas>
+
+<div class="content">
+    <div class="heart-icon">💗</div>
+    <div class="main-text" id="typewriter"></div>
+    <div class="sub-text">—— 永远爱你的人 ❤️</div>
+</div>
+
+<script>
+    // ========== 打字机效果 ==========
+    const text = "最爱杨婷了";
+    const el = document.getElementById('typewriter');
+    let i = 0;
+
+    function typeWriter() {
+        if (i < text.length) {
+            el.textContent += text.charAt(i);
+            i++;
+            setTimeout(typeWriter, 200 + Math.random() * 100);
+        }
+    }
+    setTimeout(typeWriter, 800);
+
+    // ========== 爱心粒子系统 ==========
+    const canvas = document.getElementById('heartCanvas');
+    const ctx = canvas.getContext('2d');
+    let hearts = [];
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    class Heart {
+        constructor(x, y) {
+            this.x = x || Math.random() * canvas.width;
+            this.y = y || canvas.height + 20;
+            this.size = Math.random() * 15 + 8;
+            this.speedY = Math.random() * 1.5 + 0.5;
+            this.speedX = (Math.random() - 0.5) * 0.8;
+            this.opacity = Math.random() * 0.5 + 0.3;
+            this.color = `hsla(${340 + Math.random() * 30}, 90%, 65%, ${this.opacity})`;
+        }
+
+        draw() {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            // 用贝塞尔曲线画爱心
+            const s = this.size / 15;
+            ctx.moveTo(0, -3 * s);
+            ctx.bezierCurveTo(-5 * s, -8 * s, -10 * s, -3 * s, 0, 5 * s);
+            ctx.bezierCurveTo(10 * s, -3 * s, 5 * s, -8 * s, 0, -3 * s);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        update() {
+            this.y -= this.speedY;
+            this.x += this.speedX;
+            this.opacity -= 0.002;
+            if (this.opacity <= 0) this.opacity = 0;
+        }
+    }
+
+    // 自动生成漂浮爱心
+    setInterval(() => {
+        if (hearts.length < 60) hearts.push(new Heart());
+    }, 200);
+
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        hearts.forEach((h, index) => {
+            h.draw();
+            h.update();
+            if (h.y < -30 || h.opacity <= 0) hearts.splice(index, 1);
+        });
+        requestAnimationFrame(animate);
+    }
+    animate();
+
+    // ========== 点击屏幕产生爱心涟漪 ==========
+    document.addEventListener('click', (e) => {
+        // 涟漪
+        const ripple = document.createElement('div');
+        ripple.className = 'ripple';
+        const size = 60;
+        ripple.style.cssText = `
+        width:${size}px; height:${size}px;
+        left:${e.clientX - size/2}px; top:${e.clientY - size/2}px;
+    `;
+        document.body.appendChild(ripple);
+        setTimeout(() => ripple.remove(), 800);
+
+        // 点击处生成一簇爱心
+        for (let j = 0; j < 5; j++) {
+            hearts.push(new Heart(e.clientX, e.clientY));
+        }
+    });
+</script>
 </body>
 </html>

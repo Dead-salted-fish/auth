@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<configuration >
+<configuration>
 
     <!-- 定义日志格式 -->
     <property name="APP_NAME" value="auth"/>
@@ -38,47 +38,47 @@
         </encoder>
     </appender>
     <if condition='property("LOGSTASH_ENABLED").equals("true")'>
-            <then>
-        <!-- Logstash TCP 输出 -->
-        <appender name="LOGSTASH_TCP" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
-            <!-- Logstash 服务器地址 -->
-            <destination>127.0.0.1:5000</destination>
-            <!-- 连接重试策略 -->
-            <reconnectionDelay>5000</reconnectionDelay>
-            <!-- Keep-Alive -->
-            <keepAliveDuration>5 minutes</keepAliveDuration>
-            <!-- 编码器 -->
-            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
-                <!-- 自定义字段 -->
-                <customFields>{"appName":"${APP_NAME}","environment":"${spring.profiles.active:-default}"}
-                </customFields>
-                <!-- 时间戳格式 -->
-                <timestampPattern>yyyy-MM-dd HH:mm:ss.SSSZ</timestampPattern>
-                <!-- 包含 MDC -->
-                <includeMdc>true</includeMdc>
-                <!-- 排除默认字段 -->
-                <fieldNames>
-                    <timestamp>@timestamp</timestamp>
-                    <message>message</message>
-                    <thread>thread</thread>
-                    <logger>logger</logger>
-                    <version>[ignore]</version>
-                    <levelValue>[ignore]</levelValue>
-                </fieldNames>
-                <!-- 包含调用者信息 -->
-                <includeCallerData>true</includeCallerData>
-            </encoder>
-        </appender>
+        <then>
+            <!-- Logstash TCP 输出 -->
+            <appender name="LOGSTASH_TCP" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+                <!-- Logstash 服务器地址 -->
+                <destination>127.0.0.1:5000</destination>
+                <!-- 连接重试策略 -->
+                <reconnectionDelay>5000</reconnectionDelay>
+                <!-- Keep-Alive -->
+                <keepAliveDuration>5 minutes</keepAliveDuration>
+                <!-- 编码器 -->
+                <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                    <!-- 自定义字段 -->
+                    <customFields>{"appName":"${APP_NAME}","environment":"${spring.profiles.active:-default}"}
+                    </customFields>
+                    <!-- 时间戳格式 -->
+                    <timestampPattern>yyyy-MM-dd HH:mm:ss.SSSZ</timestampPattern>
+                    <!-- 包含 MDC -->
+                    <includeMdc>true</includeMdc>
+                    <!-- 排除默认字段 -->
+                    <fieldNames>
+                        <timestamp>@timestamp</timestamp>
+                        <message>message</message>
+                        <thread>thread</thread>
+                        <logger>logger</logger>
+                        <version>[ignore]</version>
+                        <levelValue>[ignore]</levelValue>
+                    </fieldNames>
+                    <!-- 包含调用者信息 -->
+                    <includeCallerData>true</includeCallerData>
+                </encoder>
+            </appender>
 
-        <!-- 异步 Logstash 输出（提高性能） -->
-        <appender name="ASYNC_LOGSTASH" class="ch.qos.logback.classic.AsyncAppender">
-            <appender-ref ref="LOGSTASH_TCP"/>
-            <queueSize>1024</queueSize>
-            <discardingThreshold>0</discardingThreshold>
-            <includeCallerData>true</includeCallerData>
-            <neverBlock>true</neverBlock>
-        </appender>
-            </then>
+            <!-- 异步 Logstash 输出（提高性能） -->
+            <appender name="ASYNC_LOGSTASH" class="ch.qos.logback.classic.AsyncAppender">
+                <appender-ref ref="LOGSTASH_TCP"/>
+                <queueSize>1024</queueSize>
+                <discardingThreshold>0</discardingThreshold>
+                <includeCallerData>true</includeCallerData>
+                <neverBlock>true</neverBlock>
+            </appender>
+        </then>
 
     </if>
 
@@ -109,26 +109,25 @@
     </appender>
 
 
-
-            <logger name="normalLog" level="INFO" additivity="false">
-                <appender-ref ref="ASYNC_NORMAL_LOG"/>
-                <appender-ref ref="CONSOLE"/>
-                <if condition='property("LOGSTASH_ENABLED").equals("true")'>
-                    <then>
+    <logger name="normalLog" level="INFO" additivity="false">
+        <appender-ref ref="ASYNC_NORMAL_LOG"/>
+        <appender-ref ref="CONSOLE"/>
+        <if condition='property("LOGSTASH_ENABLED").equals("true")'>
+            <then>
                 <appender-ref ref="ASYNC_LOGSTASH"/>
-                    </then>
-                </if>
-            </logger>
+            </then>
+        </if>
+    </logger>
 
-            <logger name="loginLog" level="INFO" additivity="false">
-                <appender-ref ref="ASYNC_LOGIN_LOG_FILE"/>
-                <appender-ref ref="CONSOLE"/>
-                <if condition='property("LOGSTASH_ENABLED").equals("true")'>
-                    <then>
-                        <appender-ref ref="ASYNC_LOGSTASH"/>
-                    </then>
-                </if>
-            </logger>
+    <logger name="loginLog" level="INFO" additivity="false">
+        <appender-ref ref="ASYNC_LOGIN_LOG_FILE"/>
+        <appender-ref ref="CONSOLE"/>
+        <if condition='property("LOGSTASH_ENABLED").equals("true")'>
+            <then>
+                <appender-ref ref="ASYNC_LOGSTASH"/>
+            </then>
+        </if>
+    </logger>
 
 
     <!-- 定义日志级别和输出目的地 -->

@@ -1,5 +1,7 @@
 package com.lld.auth.user.repository;
 
+import com.baomidou.mybatisplus.extension.repository.CrudRepository;
+import com.baomidou.mybatisplus.extension.repository.IRepository;
 import com.lld.auth.user.entity.RoleMenu;
 import com.lld.auth.user.mapper.RoleMenuMapper;
 import org.springframework.stereotype.Repository;
@@ -7,7 +9,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public class RoleMenuRepository {
+public class RoleMenuRepository  {
     private RoleMenuMapper roleMenuMapper;
     public RoleMenuRepository(RoleMenuMapper roleMenuMapper) {
         this.roleMenuMapper = roleMenuMapper;

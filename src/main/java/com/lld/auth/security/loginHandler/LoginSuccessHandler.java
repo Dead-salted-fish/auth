@@ -8,29 +8,29 @@ import com.lld.auth.user.entity.SysUser;
 import com.lld.auth.user.entity.WebUserInfo;
 import com.lld.auth.user.mapstruct.MSUserMapper;
 import com.lld.auth.user.service.SysUserService;
-import com.lld.auth.utils.LoginLogUtil;
 import com.lld.auth.utils.AuthPublicConstantKeys;
-import com.lld.auth.utils.TokenGenerator;
-import com.lld.saltedfishutils.utils.PublicConstantKeys;
+import com.lld.auth.utils.LoginLogUtil;
+import com.lld.saltedfishutils.crypto.jwt.TokenUtil;
+import com.lld.saltedfishutils.date.DateUtil;
+import com.lld.saltedfishutils.entity.SessionInfo;
 import com.lld.saltedfishutils.redis.RedisUtil;
+import com.lld.saltedfishutils.utils.PublicConstantKeys;
+import com.lld.saltedfishutils.web.result.IpUtil;
 import com.lld.saltedfishutils.web.result.ReturnResult;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletOutputStream;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
-import javax.servlet.ServletException;
-import javax.servlet.ServletOutputStream;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 登陆成功处理
@@ -52,40 +52,49 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
     private final StringRedisTemplate stringRedisTemplate;
 
     private static final String DATE_PATTERN = "yyyy-MM-dd";
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern(DATE_PATTERN);
+
+
+    private final TokenUtil tokenUtil ;
 
 
     public LoginSuccessHandler(ObjectMapper objectMapper, RedisUtil redisUtil, SysUserService userService,
-                               LoginLogUtil loginLogUtil, LuaScriptManager luaScriptManager, StringRedisTemplate stringRedisTemplate) {
+                               LoginLogUtil loginLogUtil, LuaScriptManager luaScriptManager, StringRedisTemplate stringRedisTemplate,
+                               TokenUtil tokenUtil) {
         this.objectMapper = objectMapper;
         this.redisUtil = redisUtil;
         this.userService = userService;
         this.loginLogUtil = loginLogUtil;
         this.luaScriptManager = luaScriptManager;
         this.stringRedisTemplate = stringRedisTemplate;
+        this.tokenUtil = tokenUtil;
     }
 
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException, ServletException {
         SysUser sysUser = (SysUser) authentication.getPrincipal();
         response.setContentType("application/json;charset=utf-8");
+        String errorMessage = null;
+        String logMessage = null;
 
         // 检查账户是否因为失败次数过多被锁定
-        LoginLimit loginLimit = doRedisCheckAndLimitLua(sysUser.getUsername());
+        LoginLimit loginLimit = doRedisCheckAndLimitLua(sysUser.getUsername(), request);
         String status = loginLimit.getStatus();
-        if ("locked".equals(status)) {
-            //被锁
-            Long lockTtl = loginLimit.getLockTtl();
-            String timeInfo = formatTime(lockTtl);
-            String errmessage = "登录次数过多，请" + timeInfo + "后重试";
-            String logMessage = "账户因多次登录失败已被锁定，" + timeInfo + "后可重试";
+        boolean isLocked = "locked".equals(status) || "iplocked".equals(status);
+        if (isLocked) {
 
-            loginLogUtil.logFailureLoginAsync(sysUser.getUsername(), getClientIpAddress(request), "账密验证成功,但" + logMessage);
+            String timeInfo = formatTime(loginLimit.getLockTtl());
+            boolean isIpLocked = "iplocked".equals(status);
+            String subject = isIpLocked ? "IP" : "账户";
+
+            errorMessage = String.format("%s错误次数过多，请%s后重试", subject, timeInfo);
+            logMessage = String.format("%s因多次登录失败已被锁定，%s后可重试", subject, timeInfo);
+
+
+            loginLogUtil.logFailureLoginAsync(sysUser.getUsername(), IpUtil.getClientRealIp(request), "账密验证成功,但" + logMessage);
 
             try (ServletOutputStream outputStream = response.getOutputStream()) {
-                String result = objectMapper.writeValueAsString(ReturnResult.error(errmessage));
+                String result = objectMapper.writeValueAsString(ReturnResult.error(errorMessage));
                 outputStream.write(result.getBytes());
                 outputStream.flush();
             }
@@ -101,16 +110,21 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
         userService.updateLoginDate(sysUser.getId(), loginDate);
 
         //创建token放入redis,更新登陆时间
-        String token = TokenGenerator.generateToken();
-        recordInRedis(token, sysUser);
+        Map<String ,Object> customClaims = new HashMap<>();
+        String authoritiesStr = sysUser.getAuthorities().stream().
+                map(item -> item.getAuthority()).collect(Collectors.joining(","));
+        customClaims.put("authorities",authoritiesStr);
+        customClaims.put("test",1);
+        Map<String, Object> claims = tokenUtil.generateAccessToken(sysUser.getId(), sysUser.getUsername(), customClaims);
+        recordInRedis(claims, sysUser);
 
         //根据用户信息  生成  前端需要的用户数据
         WebUserInfo webUserInfo = MSUserMapper.INSTANCE.toWebUserInfo(sysUser);
-        webUserInfo.setToken(token);
+        webUserInfo.setToken((String) claims.get("token"));
         webUserInfo.setUserName(sysUser.getUsername());
 
         //异步记录登陆日志
-        loginLogUtil.logUserLoginAsync(sysUser.getId(), sysUser.getUsername(), getClientIpAddress(request));
+        loginLogUtil.logUserLoginAsync(sysUser.getId(), sysUser.getUsername(), IpUtil.getClientRealIp(request));
 
         try (ServletOutputStream outputStream = response.getOutputStream()) {
             String result = objectMapper.writeValueAsString(ReturnResult.OK(webUserInfo));
@@ -141,10 +155,12 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
      * 登录失败时，记录失败次数，检查账户是否因为登录过多被锁定
      * 登录成功时，检查是否因为登录失败次数过多而被锁定
      **/
-    private LoginLimit doRedisCheckAndLimitLua(String username) {
+    private LoginLimit doRedisCheckAndLimitLua(String username, HttpServletRequest request) {
         List<String> keys = Arrays.asList(
                 AuthPublicConstantKeys.USER_LOGIN_FAIL_LOCK_PREFIX + username,
-                AuthPublicConstantKeys.USER_LOGIN_FAIL_COUNT_PREFIX  + username
+                AuthPublicConstantKeys.USER_LOGIN_FAIL_COUNT_PREFIX  + username,
+                AuthPublicConstantKeys.IP_LOGIN_FAIL_LOCK_PREFIX+ IpUtil.getClientRealIp(request),
+                AuthPublicConstantKeys.IP_LOGIN_FAIL_COUNT_PREFIX+ IpUtil.getClientRealIp(request) // 这里有问题，请求走nginx转发的，ip地址获取不对
         );
 
         // 修改 ARGV 为 List<String> 类型
@@ -169,23 +185,42 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
     /**
      * 登录成功后redis记录信息
      */
-    private void recordInRedis(String token, SysUser sysUser) throws JsonProcessingException {
-        String redisTokenKey = PublicConstantKeys.Redis_User_Token_Prefix  + token;
-        String todayOnlineBitmapKey = AuthPublicConstantKeys.TODAY_ONLINE_BITMAP_PREFIX+LocalDate.now().format(DATE_FORMATTER);
+    private void recordInRedis(Map<String, Object> claims, SysUser sysUser) throws JsonProcessingException {
+        // redis 用户token存放的key
+        String redisTokenKey = PublicConstantKeys.Redis_User_Token_Prefix  + sysUser.getId().toString();
+        // redis 中用户版本号
+        String redisVersionKey = PublicConstantKeys.Redis_User_Version_Prefix + sysUser.getId().toString();
+        // redis 记录当日 登陆过的用户 位图的key
+        String todayOnlineBitmapKey = AuthPublicConstantKeys.USER_LOGGED_BITMAP_PREFIX+ DateUtil.formatDate(new Date(),DATE_PATTERN);
+
+        SessionInfo sessionInfo = SessionInfo.builder()
+                .jti(String.valueOf(claims.get("jti")))
+                .userId(String.valueOf(sysUser.getId()))
+                .userName(sysUser.getUsername())
+                .loginTime(System.currentTimeMillis())
+                .expireTime((Long) claims.get("expirationTime"))
+                .version(sysUser.getVersion())
+                .authority(sysUser.getAuthorities()
+                        .stream()
+                        .map(GrantedAuthority::getAuthority)
+                        .collect(Collectors.joining(",")))
+                .build();
+
         List<String> keys = Arrays.asList(
-                redisTokenKey, //tokenKey  用户token
+                redisTokenKey,
+                redisVersionKey,//tokenKey  用户token
                 AuthPublicConstantKeys.ONLINE_BITMAP_KEY,   //onlineBitmapKey 在线用户bitmap
-                AuthPublicConstantKeys.ACTIVITY_ZSET_KEY,  //activityZsetKey 活跃用户zset
+                AuthPublicConstantKeys.ACTIVITY_ZSET_KEY,  //activityZsetKey 活跃用户zset  已经废弃，后面换其统计方式
                 todayOnlineBitmapKey
         );
 
         // 修改 ARGV 为 List<String> 类型
         String[] argv = {
-                String.valueOf(objectMapper.writeValueAsString(sysUser)), //用户token的值
+                String.valueOf(claims.get("jti")),
+                sysUser.getVersion()==null?"0": sysUser.getVersion(),
+                objectMapper.writeValueAsString(sessionInfo), //用户token的值
                 String.valueOf(PublicConstantKeys.User_Token_Expire_Seconds), //用户token的过期时间
-                String.valueOf(sysUser.getId()), //用户id
-                String.valueOf(System.currentTimeMillis()),
-
+                String.valueOf(sysUser.getId())
         };
 
         RedisScript<List> loginRecordScript = luaScriptManager.getLoginScript();
@@ -199,14 +234,5 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
 
 
     }
-   /**
-    *  获取客户端ip
-    * **/
-    private String getClientIpAddress(HttpServletRequest request) {
-        String xfHeader = request.getHeader("X-Forwarded-For");
-        if (xfHeader == null) {
-            return request.getRemoteAddr();
-        }
-        return xfHeader.split(",")[0];
-    }
+
 }

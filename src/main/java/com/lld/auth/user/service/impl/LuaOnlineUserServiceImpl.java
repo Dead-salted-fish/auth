@@ -78,7 +78,7 @@ public class LuaOnlineUserServiceImpl implements LuaOnlineUserService {
         String todayStr = LocalDate.now().format(DATE_FORMATTER);
         List<String> keys = Arrays.asList(
                 AuthPublicConstantKeys.ONLINE_BITMAP_KEY,
-                 AuthPublicConstantKeys.TODAY_ONLINE_BITMAP_PREFIX+todayStr
+                 AuthPublicConstantKeys.USER_LOGGED_BITMAP_PREFIX+todayStr
 
         );
 

@@ -2,20 +2,14 @@ package com.lld.auth.user.service.impl;
 
 import com.lld.auth.redis.lua.LuaScriptManager;
 import com.lld.auth.security.entity.MyUsernamePasswordAuthenticationToken;
+import com.lld.auth.user.entity.*;
 import com.lld.auth.user.entity.DTO.SysUserDto;
-import com.lld.auth.user.entity.EncryptedRecords;
-import com.lld.auth.user.entity.OnlineStatistics;
-import com.lld.auth.user.entity.SysUser;
 import com.lld.auth.user.entity.VO.SysUserVo;
-import com.lld.auth.user.entity.WebMenu;
 import com.lld.auth.user.mapper.EncryptedRecordsMapper;
 import com.lld.auth.user.mapper.SysUserMapper;
 import com.lld.auth.user.mapstruct.MSUserMapper;
 import com.lld.auth.user.repository.SysUserRepository;
-import com.lld.auth.user.service.LuaOnlineUserService;
-import com.lld.auth.user.service.SysMenuService;
-import com.lld.auth.user.service.SysRoleService;
-import com.lld.auth.user.service.SysUserService;
+import com.lld.auth.user.service.*;
 import com.lld.auth.utils.AuthPublicConstantKeys;
 import com.lld.auth.utils.SecurityUserUtils;
 import com.lld.saltedfishutils.entity.WebComponentVO.SelectOptionVO;
@@ -28,6 +22,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -66,13 +61,16 @@ public class SysUserServiceImpl implements SysUserService {
     //SysUserRepository
     private SysUserRepository sysUserRepository;
 
+    private IUserRoleService userRoleService;
+
     private static final String DATE_PATTERN = "yyyy-MM-dd";
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern(DATE_PATTERN);
 
     public SysUserServiceImpl(SysUserMapper sysUserMapper, EncryptedRecordsMapper encryptedRecordsMapper,
                               PasswordEncoder passwordEncoder, SysMenuService sysMenuService, SysRoleService sysRoleService,
                               RedisUtil redisUtil, LuaOnlineUserService luaOnlineUserService, LuaScriptManager luaScriptManager,
-                              StringRedisTemplate stringRedisTemplate, SysUserRepository sysUserRepository) {
+                              StringRedisTemplate stringRedisTemplate, SysUserRepository sysUserRepository,
+                              IUserRoleService userRoleService) {
         this.sysUserMapper = sysUserMapper;
         this.encryptedRecordsMapper = encryptedRecordsMapper;
         this.passwordEncoder = passwordEncoder;
@@ -83,6 +81,7 @@ public class SysUserServiceImpl implements SysUserService {
         this.luaScriptManager = luaScriptManager;
         this.stringRedisTemplate = stringRedisTemplate;
         this.sysUserRepository = sysUserRepository;
+        this.userRoleService = userRoleService;
     }
 
 
@@ -98,12 +97,13 @@ public class SysUserServiceImpl implements SysUserService {
         //使用注册的密码器加密
         String encode = passwordEncoder.encode(sysUser.getPassword());
         sysUser.setPassWord(encode);
-        //设置注册用户默认值
+        // 默认 1 为正常状态
         sysUser.setStatus("1");
         Date date = new Date();
         sysUser.setCreateTime(date);
         sysUser.setUpdateTime(date);
-        sysUser.setRoles("3");
+        // 设置默认角色为3，普通用户
+        userRoleService.updateUserRoles(sysUser.getId(),"3",new Date());
         sysUserRepository.insertSingle(sysUser);
         return ReturnResult.OK();
     }
@@ -152,15 +152,25 @@ public class SysUserServiceImpl implements SysUserService {
 
     @Override
     public ReturnResult getUserList() {
+        // 获取所有用户
         List<SysUser> sysUsers = sysUserRepository.selectList(null);
-        List<SysUserVo> sysUserVos = new ArrayList<>();
+        //获取角色名称
         Map<Long, String> rolesMap = sysRoleService.getRoleMap();
+        // 获取用户的角色
+        List<Long> userIds = sysUsers.stream().map(SysUser::getId).collect(Collectors.toList());
+        Map<Long, List<Long>> userRolesMap = userRoleService.getUserRolesByUserIds(userIds)
+                .stream()
+                .collect(Collectors.groupingBy(
+                        UserRole::getUserId,
+                        Collectors.mapping(UserRole::getRoleId, Collectors.toList())
+                ));
+        List<SysUserVo> sysUserVos = new ArrayList<>();
         for (SysUser sysUser : sysUsers) {
             SysUserVo sysUserVo = msUserMapper.SysUserToSysUserVo(sysUser);
             //单独设置userName字段
             sysUserVo.setUserName(sysUser.getUsername());
             //设置角色名称
-            setSysUserVoSomeFields(rolesMap,sysUserVo);
+            setSysUserVoSomeFields(rolesMap,sysUserVo,userRolesMap.get(sysUser.getId()));
 
             sysUserVos.add(sysUserVo);
         }
@@ -170,14 +180,15 @@ public class SysUserServiceImpl implements SysUserService {
     /**
      * 对sysUserVo某些字段进行补充
      * **/
-    public void setSysUserVoSomeFields(Map<Long, String> rolesMap ,SysUserVo sysUserVo){
-        String[] roleSplit = sysUserVo.getRoles().split(",");
+    public void setSysUserVoSomeFields(Map<Long, String> rolesMap ,SysUserVo sysUserVo,List<Long> roleIds){
+
         StringBuilder roleBuilder = new StringBuilder();
-        for (String role : roleSplit) {
-            String roleName = rolesMap.get(Long.valueOf(role));
-            roleBuilder.append(roleName).append(",");
+        if(!CollectionUtils.isEmpty(roleIds)){
+            for (Long roleId : roleIds) {
+                roleBuilder.append(rolesMap.get(roleId)).append(",");
+            }
+            sysUserVo.setRolesStr(roleBuilder.substring(0,roleBuilder.length()-1).toString());
         }
-        sysUserVo.setRolesStr(roleBuilder.substring(0,roleBuilder.length()-1).toString());
         //设置状态名称
         sysUserVo.setStatusStr(sysUserVo.getStatus().equals("1")?"正常":"禁用");
     }
@@ -210,35 +221,51 @@ public class SysUserServiceImpl implements SysUserService {
         Date now = new Date();
         sysUser.setCreateTime(now);
         sysUser.setUpdateTime(now);
+        // 检查用户是否是超级管理员
+        Boolean superAdmin = Arrays.asList(sysUserDto.getRoles().split(",")).contains("1");
+        if(superAdmin){
+            throw new RuntimeException("用户暂时不能赋予超级管理员权限");
+        }
+        // 新增用户 更新用户角色
         sysUserMapper.insertSingle(sysUser);
+        userRoleService.updateUserRoles(sysUser.getId(),sysUserDto.getRoles(),now);
         return ReturnResult.OK();
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public ReturnResult updateUser(SysUserDto sysUserDto) {
         MyUsernamePasswordAuthenticationToken authentication = (MyUsernamePasswordAuthenticationToken)SecurityContextHolder.getContext().getAuthentication();
         Long userId = authentication.getUserId();
         SysUser sysUser = msUserMapper.SysUserDtoToSysUser(sysUserDto);
-        Boolean superAdmin = Arrays.asList(sysUser.getRoles().split(",")).contains("1");
+        Boolean superAdmin = Arrays.asList(sysUserDto.getRoles().split(",")).contains("1");
         if(superAdmin){
             throw new RuntimeException("用户暂时不能赋予超级管理员权限");
         }
         sysUser.setUpdater(userId);
         Date now = new Date();
         sysUser.setUpdateTime(now);
+        // 更新用户
         int i = sysUserMapper.updateUserById(sysUser);
         if(i == 0){
             return ReturnResult.error("未找到用户");
         }
+        // 更新用户角色
+        userRoleService.updateUserRoles(sysUser.getId(),sysUserDto.getRoles(),now);
         return ReturnResult.OK();
     }
 
     @Override
     public ReturnResult getUserById(Long id) {
         SysUser sysUser = sysUserRepository.selectById(id);
+        List<UserRole> userRolesByUserIds = userRoleService.getUserRolesByUserIds(List.of(id));
         if(sysUser != null){
             SysUserVo sysUserVo = msUserMapper.SysUserToSysUserVo(sysUser);
             sysUserVo.setUserName(sysUser.getUsername());
+            sysUserVo.setRoles(userRolesByUserIds.stream()
+                    .map(UserRole::getRoleId)
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(",")));
 
             return ReturnResult.OK(sysUserVo);
         }
@@ -246,12 +273,14 @@ public class SysUserServiceImpl implements SysUserService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public ReturnResult deleteById(SysUserDto sysUserDto) {
-
-        int delete = sysUserRepository.deleteById(sysUserDto.getId());
+        Long userId = sysUserDto.getId();
+        int delete = sysUserRepository.deleteById(userId);
         if (delete == 0){
             return ReturnResult.error("未找到用户");
         }
+        userRoleService.deleteUserRolesByUserId(userId);
         return ReturnResult.OK();
     }
 
@@ -260,12 +289,23 @@ public class SysUserServiceImpl implements SysUserService {
      * **/
     @Override
     public List<String> getRolesByUserId(Long userId) {
-        SysUser sysUser = sysUserMapper.selectById(userId);
-        List<Long> roleIds = Arrays.stream(sysUser.getRoles().split(",")).map(item -> Long.parseLong(item)).collect(Collectors.toList());
-        List<String> rolesById = sysRoleService.getRolesById(roleIds);
-        return rolesById;
-    }
+        List<UserRole> userRolesByUserIds = userRoleService.getUserRolesByUserIds(List.of(userId));
+        //获取角色名称
+        List<SysRole> roles= sysRoleService.getAllRoles();
 
+        // 获取用户的角色名
+        return  userRolesByUserIds.stream().
+                map(userRole ->{
+                           return roles.stream()
+                                   .filter(role -> role.getId().equals(userRole.getRoleId()))
+                                   .map(SysRole::getRole)
+                                   .findFirst()
+                                   .orElse(null);
+                        }
+
+                ).collect(Collectors.toList());
+
+    }
     /**
      * 根据用户id获取用户详情
      * */
@@ -275,7 +315,15 @@ public class SysUserServiceImpl implements SysUserService {
         SysUserVo sysUserVo = msUserMapper.SysUserToSysUserVo(sysUser);
         sysUserVo.setUserName(sysUser.getUsername());
         Map<Long, String> rolesMap = sysRoleService.getRoleMap();
-        setSysUserVoSomeFields(rolesMap,sysUserVo);
+        // 获取用户的角色
+        Map<Long, List<Long>> userRolesMap = userRoleService.getUserRolesByUserIds(List.of(userId))
+                .stream()
+                .collect(Collectors.groupingBy(
+                        UserRole::getUserId,
+                        Collectors.mapping(UserRole::getRoleId, Collectors.toList())
+                ));
+
+        setSysUserVoSomeFields(rolesMap,sysUserVo,userRolesMap.get(userId));
         return ReturnResult.OK(sysUserVo);
     }
 
@@ -283,7 +331,7 @@ public class SysUserServiceImpl implements SysUserService {
     public ReturnResult userHeartBeat(Long id, Integer status) {
         Long userId = SecurityUserUtils.getCurrentUserId();
         long currentTimeMillis = System.currentTimeMillis();
-        String todayOnlineBitmapKey = AuthPublicConstantKeys.TODAY_ONLINE_BITMAP_PREFIX+LocalDate.now().format(DATE_FORMATTER);
+        String todayOnlineBitmapKey = AuthPublicConstantKeys.USER_LOGGED_BITMAP_PREFIX+LocalDate.now().format(DATE_FORMATTER);
 
         //获取三个key
         List<String> keys = Arrays.asList(

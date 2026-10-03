@@ -73,7 +73,7 @@ class LuaScriptLoader {
             Resource resource = new ClassPathResource("lua/" + scriptName);
             return StreamUtils.copyToString(resource.getInputStream(), StandardCharsets.UTF_8);
         } catch (IOException e) {
-            throw new RuntimeException("Failed to load Lua script: " + scriptName, e);
+            throw new RuntimeException("加载lua脚本失败: " + scriptName, e);
         }
     }
 }

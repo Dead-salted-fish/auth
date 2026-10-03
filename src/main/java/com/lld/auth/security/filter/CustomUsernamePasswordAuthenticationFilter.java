@@ -4,6 +4,9 @@ import com.lld.auth.user.entity.EncryptedRecords;
 import com.lld.auth.utils.EncrytedRecordHelper;
 import com.lld.saltedfishutils.crypto.AESUtil;
 import com.lld.saltedfishutils.crypto.RSAUtil;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.HttpMethod;
 import org.springframework.lang.Nullable;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationServiceException;
@@ -11,12 +14,10 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.authentication.AbstractAuthenticationProcessingFilter;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
@@ -30,8 +31,9 @@ public class CustomUsernamePasswordAuthenticationFilter extends AbstractAuthenti
 
     public static final String SPRING_SECURITY_FORM_PASSWORD_KEY = "password";
 
-    private static final AntPathRequestMatcher DEFAULT_ANT_PATH_REQUEST_MATCHER = new AntPathRequestMatcher("/auth/user/login",
-            "POST");
+    private static final RequestMatcher DEFAULT_ANT_PATH_REQUEST_MATCHER =
+            request -> request.getRequestURI().equals("/auth/user/login")
+                    && request.getMethod().equals(HttpMethod.POST.name());
 
     private String usernameParameter = SPRING_SECURITY_FORM_USERNAME_KEY;
 
@@ -77,7 +79,7 @@ public class CustomUsernamePasswordAuthenticationFilter extends AbstractAuthenti
         try {
            map = decryptUserAndPassword(username, password, encryptedAesKey, clientRsaId);
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new AuthenticationServiceException("账号密码 解密出现错误");
         }
 
         username = map.get("username");

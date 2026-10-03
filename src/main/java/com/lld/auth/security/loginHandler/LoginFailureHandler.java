@@ -5,7 +5,12 @@ import com.lld.auth.redis.lua.LuaScriptManager;
 import com.lld.auth.security.entity.LoginLimit;
 import com.lld.auth.utils.LoginLogUtil;
 import com.lld.auth.utils.AuthPublicConstantKeys;
+import com.lld.saltedfishutils.web.result.IpUtil;
 import com.lld.saltedfishutils.web.result.ReturnResult;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletOutputStream;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -15,10 +20,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.stereotype.Component;
 
-import javax.servlet.ServletException;
-import javax.servlet.ServletOutputStream;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
@@ -52,36 +54,38 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
         response.setContentType("application/json;charset=utf-8");
 
         String username = (String) request.getAttribute("fromWebUsername");
-        String remoteAddr = request.getRemoteAddr();
+        String remoteAddr = IpUtil.getClientRealIp(request);
         String errorMessage = null;
         String logMessage = null;
 
         // 执行Lua脚本，看失败后是否限制 ，失败超过三次会被限制登录
-        LoginLimit loginLimit = doRedisCheckAndLimitLua(username);
+        LoginLimit loginLimit = doRedisCheckAndLimitLua(username, request);
         String status = loginLimit.getStatus();
 
 
         // 检查账号是否被锁定
-        boolean isLocked = "locked".equals(status);
+        boolean isLocked = "locked".equals(status) || "iplocked".equals(status);
         if (isLocked) {
-            Long lockTtl = loginLimit.getLockTtl();
-            String timeInfo = formatTime(lockTtl);
-            errorMessage = "登录次数过多，请" + timeInfo + "后重试";
-            logMessage = "账户因多次登录失败已被锁定，" + timeInfo + "后可重试";
-        }
+            // 最高优先级：Redis 限流锁定
+            String timeInfo = formatTime(loginLimit.getLockTtl());
+            boolean isIpLocked = "iplocked".equals(status);
+            String subject = isIpLocked ? "IP" : "账户";
 
+            errorMessage = String.format("%s错误次数过多，请%s后重试", subject, timeInfo);
+            logMessage = String.format("%s因多次登录失败已被锁定，%s后可重试", subject, timeInfo);
+        }
         // 根据异常类型设置错误信息
-        if (exception instanceof UsernameNotFoundException) {
-            errorMessage = errorMessage == null ? "用户名或密码不正确，请重新输入" : errorMessage;
+        else if (exception instanceof UsernameNotFoundException) {
+            errorMessage =  "用户名或密码不正确，请重新输入" ;
             logMessage = appendLogMessage(logMessage, "没有此用户");
         } else if (exception instanceof BadCredentialsException) {
-            errorMessage = errorMessage == null ? "用户名或密码不正确，请重新输入" : errorMessage;
+            errorMessage =  "用户名或密码不正确，请重新输入" ;
             logMessage = appendLogMessage(logMessage, "密码错误");
         } else if (exception instanceof LockedException) {
-            errorMessage = errorMessage == null ? "账户已被锁定，请联系管理员" : errorMessage;
+            errorMessage =  "账户已被锁定，请联系管理员" ;
             logMessage = appendLogMessage(logMessage, "账户已被锁定，请联系管理员");
         } else {
-            errorMessage = errorMessage == null ? exception.getMessage(): errorMessage;
+            errorMessage = exception.getMessage();
             logMessage = appendLogMessage(logMessage, errorMessage);;
         }
 
@@ -126,16 +130,18 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
      * 登录失败时，记录失败次数，检查账户是否因为登录过多被锁定
      * 登录成功时，检查是否因为登录失败次数过多而被锁定
      * **/
-    private LoginLimit doRedisCheckAndLimitLua(String username) {
+    private LoginLimit doRedisCheckAndLimitLua(String username, HttpServletRequest request) {
         List<String> keys = Arrays.asList(
                 AuthPublicConstantKeys.USER_LOGIN_FAIL_LOCK_PREFIX  + username,
-                AuthPublicConstantKeys.USER_LOGIN_FAIL_COUNT_PREFIX + username
+                AuthPublicConstantKeys.USER_LOGIN_FAIL_COUNT_PREFIX + username,
+                AuthPublicConstantKeys.IP_LOGIN_FAIL_LOCK_PREFIX+ IpUtil.getClientRealIp(request),
+                AuthPublicConstantKeys.IP_LOGIN_FAIL_COUNT_PREFIX+ IpUtil.getClientRealIp(request)
         );
 
         // 修改 ARGV 为 List<String> 类型
         String[] argv = {
                 "false", //登录成功或者失败的标记
-                "3", //失败次数
+                "3", //最大失败次数
                 "600",//锁定时间
                 "180"//计数过期时间
         };

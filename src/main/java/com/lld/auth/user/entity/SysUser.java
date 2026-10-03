@@ -8,6 +8,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
+import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
@@ -46,11 +47,11 @@ public class SysUser implements Serializable, UserDetails {
     @TableField(value = "pass_word")
     private String passWord;
 
+
     /**
-     * 密码
+     * 版本号
      */
-    @TableField(value = "roles")
-    private String roles;
+    private String version;
 
     /**
      * 用户头像
@@ -118,9 +119,12 @@ public class SysUser implements Serializable, UserDetails {
     @TableField(exist = false)
     private static final long serialVersionUID = 1L;
 
+    @TableField(exist = false)
+    private List<GrantedAuthority> userAuthorities;
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return AuthorityUtils.NO_AUTHORITIES ;
+        return userAuthorities ;
     }
 
     @Override

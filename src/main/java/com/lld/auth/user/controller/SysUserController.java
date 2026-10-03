@@ -1,15 +1,16 @@
 package com.lld.auth.user.controller;
 
-import com.lld.auth.annotation.RequireRole;
 import com.lld.auth.user.entity.DTO.SysUserDto;
 import com.lld.auth.user.entity.SysUser;
 import com.lld.auth.user.service.SysUserService;
 import com.lld.saltedfishutils.web.result.ReturnResult;
+import jakarta.annotation.security.PermitAll;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 @RequestMapping("/auth")
 @RestController
-@RequireRole(roles = {"saltedadmin","admin"})
+@PreAuthorize("hasAnyRole('saltedadmin','admin')")
 public class SysUserController {
     @Autowired
     private SysUserService sysUserService;
@@ -19,15 +20,16 @@ public class SysUserController {
         return  sysUserService.registerUser(sysUser);
 
     }
-    @RequireRole(roles = {"noAuthentication"})
+
     @PostMapping("/user/getClientRsaPublicKey")
+    @PreAuthorize("permitAll()")
     public ReturnResult getClientRsaPublicKey() throws Exception {
         return  sysUserService.getClientRsaPublicKey();
 
     }
 
     @GetMapping("/user/getMenus")
-    @RequireRole(roles = {"noAuthentication"})
+    @PreAuthorize("permitAll()")
     public ReturnResult getMenus(String token) throws Exception {
         System.out.println("token"+ token);
         return  sysUserService.getMenus();
@@ -88,7 +90,6 @@ public class SysUserController {
      * 用户心跳，更新用户状态
      * roles = {"noAuthentication"} 表示不需要权限，但还是要登录的
      * */
-    @RequireRole(roles = {"noAuthentication"})
     @GetMapping("/user/userHeartBeat")
     public ReturnResult userHeartBeat(Long  id,Integer status) throws Exception {
 

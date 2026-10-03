@@ -5,11 +5,12 @@ import com.lld.auth.user.entity.DTO.RoleMenuAssignmentDto;
 import com.lld.auth.user.service.RoleMenuService;
 import com.lld.saltedfishutils.web.result.ReturnResult;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RequestMapping("/auth/roleMenu")
 @RestController
-@RequireRole(roles = {"saltedadmin","admin"})
+@PreAuthorize("hasAnyRole('saltedadmin','admin')")
 public class RoleMenuController {
 
     @Autowired

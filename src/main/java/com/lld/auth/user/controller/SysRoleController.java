@@ -4,11 +4,12 @@ import com.lld.auth.annotation.RequireRole;
 import com.lld.auth.user.entity.DTO.SysRoleDto;
 import com.lld.auth.user.service.SysRoleService;
 import com.lld.saltedfishutils.web.result.ReturnResult;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RequestMapping("/auth/role")
 @RestController
-@RequireRole(roles = {"saltedadmin","admin"})
+@PreAuthorize("hasAnyRole('saltedadmin','admin')")
 public class SysRoleController {
 
     private SysRoleService sysRoleService;

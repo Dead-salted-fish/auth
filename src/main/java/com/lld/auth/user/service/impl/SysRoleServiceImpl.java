@@ -142,6 +142,13 @@ public class SysRoleServiceImpl implements SysRoleService {
         supplementSysRoleVoSomeFields(sysRoleVo);
         return ReturnResult.OK(sysRoleVo);
     }
+
+    @Override
+    public List<SysRole> getAllRoles() {
+        return sysRoleRepository.selectList();
+
+    }
+
     /**
      * 补充SysRoleVo某些字段值
      * **/
