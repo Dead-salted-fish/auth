@@ -1,18 +1,18 @@
 -- 参数说明：
--- KEYS[1]: 用户锁定状态key (格式: user_login_fail_lock)
--- KEYS[2]: 用户登录失败次数key (格式: user_login_fail_count)
--- KEYS[3]: ip锁定次数
--- KEYS[4]: ip锁定状态key
+-- KEYS[1]: 用户锁定状态key
+-- KEYS[2]: 用户登录失败次数key
+-- KEYS[3]: ip锁定状态key
+-- KEYS[4]: ip登录失败次数key
 
 -- ARGV[1]: 登录结果 ("true":成功, "false":失败) ← 注意是字符串
 -- ARGV[2]: 最大失败次数
--- ARGV[3]: 锁定时间 ("600"秒 = 10分钟)
--- ARGV[4]: 计数过期时间 ("180"秒 = 3分钟)
+-- ARGV[3]: 发生锁定时，锁定时间 ("600"秒 = 10分钟)
+-- ARGV[4]: 失败次数计数过期时间 ("180"秒 = 3分钟)
 
 local login_result = ARGV[1]  -- 字符串："true" 或 "false"
-local max_failures = tonumber(ARGV[2])
-local lock_duration = tonumber(ARGV[3])
-local count_expire = tonumber(ARGV[4])
+local account_max_failures = tonumber(ARGV[2])  -- 账户最大失败次数
+local lock_duration = tonumber(ARGV[3]) -- 锁定时间
+local count_expire = tonumber(ARGV[4]) -- 计数过期时间
 
 -- 检查IP是否已被锁定
 local ip_is_locked = redis.call('get', KEYS[3])
@@ -44,8 +44,8 @@ if login_result == 'true' then  -- 比较字符串
     return {
         'success',
          0,
-        max_failures,
-         'reset'
+        account_max_failures,
+         'reset' -- 行为
     }
 end
 
@@ -59,7 +59,7 @@ if fail_count == 1 then
 end
 
 -- 检查是否达到锁定阈值
-if fail_count >= max_failures then
+if fail_count >= account_max_failures then
     -- 先检查是否已经存在锁定
     local existing_lock_ttl = redis.call('ttl', KEYS[1])
 
@@ -72,8 +72,8 @@ if fail_count >= max_failures then
             'rejected'
         }
     else
-        -- 首次锁定，设置新的锁定时间
-        redis.call('setex', KEYS[1], lock_duration, 'locked')
+        -- 首次锁定，设置新的锁定时间；值中记录 最大失败次数:当前失败次数
+        redis.call('set', KEYS[1], 'locked:' .. max_failures .. ':' .. fail_count, 'EX', lock_duration)
         redis.call('del', KEYS[2])
         -- 检查IP是否已被锁定
         local current_ip_lock_ttl = redis.call('ttl', KEYS[3])
@@ -82,8 +82,8 @@ if fail_count >= max_failures then
             if ip_fail_count == 1 then
                 redis.call('expire', KEYS[4], count_expire)
             end
-            if ip_fail_count >= max_failures then
-                redis.call('set', KEYS[3], 'locked', 'EX', lock_duration)
+            if ip_fail_count >= account_max_failures then
+                redis.call('set', KEYS[3], 'iplocked', 'EX', lock_duration)
                 return {
                     'iplocked',
                     lock_duration,
@@ -97,13 +97,13 @@ if fail_count >= max_failures then
              'locked',
              lock_duration,
             0,
-            'locked'
+            'rejected'
         }
     end
 end
 
 -- 返回剩余尝试次数
-local remaining = max_failures - fail_count
+local remaining = account_max_failures - fail_count
 return {
      'failed',
     redis.call('ttl', KEYS[1]),
