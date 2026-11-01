@@ -1,7 +1,6 @@
 package com.lld.auth.security.loginHandler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.lld.auth.redis.lua.LuaScriptManager;
 import com.lld.auth.security.entity.LoginLimit;
 import com.lld.auth.security.entity.LoginLimitProperties;
 import com.lld.auth.utils.AuthPublicConstantKeys;
@@ -13,7 +12,6 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.Authentication;
