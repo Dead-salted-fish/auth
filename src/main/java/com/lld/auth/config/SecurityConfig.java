@@ -84,12 +84,18 @@ public class SecurityConfig {
 
 
 
+    /**
+     * 自定义密码加密器
+     */
     @Bean
     public PasswordEncoder passwordEncoder() {
         // 使用 Spring Security 5.7+ 推荐的 DelegatingPasswordEncoder
         return CustomPasswordEncoderFactories.createRandomPasswordEncoder();
     }
 
+    /**
+     * 自定义认证提供者 也就是查询用户和用户权限
+     */
     @Bean
     public AuthenticationProvider daoAuthenticationProvider() {
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
@@ -108,7 +114,7 @@ public class SecurityConfig {
     }
 
     /**
-     * Spring Security 5.7+ 核心安全过滤器链配置 (替代 WebSecurityConfigurerAdapter)
+     * 自定义 SecurityFilterChain，如果没有这个，则会使用默认的 SecurityFilterChain
      */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, AuthenticationManager authenticationManager) throws Exception {
@@ -134,6 +140,7 @@ public class SecurityConfig {
         http.addFilterAt(myAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         // Token 认证过滤器
+        // 判断请求中有无token，有token则从中解析出用户
         TokenAuthenticationFilter tokenAuthenticationFilter = new TokenAuthenticationFilter(authenticationManager,
                 redisUtil,
                 objectMapper,

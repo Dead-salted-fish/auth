@@ -15,7 +15,7 @@ public class AuthPublicConstantKeys {
 
     //用户连续登录失败次数 前缀
     public static final String USER_LOGIN_FAIL_COUNT_PREFIX= "auth:login:fail:count:";
-    //用户连续登录失败被限制登录 前缀
+    //IP连续登录失败被限制登录 前缀
     public static final String IP_LOGIN_FAIL_LOCK_PREFIX= "auth:login:fail:ip:lock:";
     //IP连续锁定账户次数
     public static final String IP_LOGIN_FAIL_COUNT_PREFIX= "auth:login:fail:ip:count:";

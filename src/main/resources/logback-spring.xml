@@ -5,6 +5,7 @@
     <!-- 定义日志格式 -->
     <property name="APP_NAME" value="auth"/>
     <property name="LOGSTASH_ENABLED" value="${LOGSTASH_ENABLED:-false}"/>
+
     <!-- 输出到控制台 -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
@@ -14,9 +15,9 @@
 
     <!-- 通用请求日志 -->
     <appender name="NORMAL_LOG" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>./logs/auth/request.log</file>
+        <file>./logs/auth/auth.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-            <fileNamePattern>logs/auth/request.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <fileNamePattern>logs/auth/auth.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
             <maxFileSize>100MB</maxFileSize>
             <maxHistory>30</maxHistory>
         </rollingPolicy>
@@ -26,7 +27,7 @@
     </appender>
 
     <!--   登录日志-->
-    <appender name="LOGIN_LOG_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <appender name="LOGIN_LOG" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>./logs/login/login.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
             <fileNamePattern>logs/login/login.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
@@ -98,19 +99,21 @@
         <appender-ref ref="NORMAL_LOG"/>
     </appender>
 
-    <!-- 用户心跳日志 - 异步 -->
-    <appender name="ASYNC_LOGIN_LOG_FILE" class="ch.qos.logback.classic.AsyncAppender">
+    <!-- 登录日志 - 异步 -->
+    <appender name="ASYNC_LOGIN_LOG" class="ch.qos.logback.classic.AsyncAppender">
         <discardingThreshold>0</discardingThreshold>
         <queueSize>4096</queueSize>
         <includeCallerData>false</includeCallerData>
         <neverBlock>true</neverBlock>
         <maxFlushTime>500</maxFlushTime>
-        <appender-ref ref="LOGIN_LOG_FILE"/>
+        <appender-ref ref="LOGIN_LOG"/>
     </appender>
 
-
+    <!--   普通日志输出到 普通日志文件和控制台-->
     <logger name="normalLog" level="INFO" additivity="false">
+        <!--        普通日志文件-->
         <appender-ref ref="ASYNC_NORMAL_LOG"/>
+        <!--控制台-->
         <appender-ref ref="CONSOLE"/>
         <if condition='property("LOGSTASH_ENABLED").equals("true")'>
             <then>
@@ -119,8 +122,13 @@
         </if>
     </logger>
 
-    <logger name="loginLog" level="INFO" additivity="false">
-        <appender-ref ref="ASYNC_LOGIN_LOG_FILE"/>
+    <!-- 登录日志输出到 普通日志文件，登录日志文件和控制台 -->
+        <logger name="loginLog" level="INFO" additivity="false">
+        <!--登录日志文件-->
+        <appender-ref ref="ASYNC_LOGIN_LOG"/>
+        <!--控制台-->
+        <appender-ref ref="ASYNC_NORMAL_LOG"/>
+        <!--控制台-->
         <appender-ref ref="CONSOLE"/>
         <if condition='property("LOGSTASH_ENABLED").equals("true")'>
             <then>
@@ -131,8 +139,15 @@
 
 
     <!-- 定义日志级别和输出目的地 -->
+    <!--    兜底日志 输出到 控制台和普通日志文件 -->
     <root level="info">
         <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="ASYNC_APP_LOG"/>
+        <if condition='property("LOGSTASH_ENABLED").equals("true")'>
+            <then>
+                <appender-ref ref="ASYNC_LOGSTASH"/>
+            </then>
+        </if>
     </root>
 </configuration>
 

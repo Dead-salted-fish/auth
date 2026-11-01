@@ -9,7 +9,7 @@ import com.lld.auth.user.entity.WebUserInfo;
 import com.lld.auth.user.mapstruct.MSUserMapper;
 import com.lld.auth.user.service.SysUserService;
 import com.lld.auth.utils.AuthPublicConstantKeys;
-import com.lld.auth.utils.LoginLogUtil;
+import com.lld.auth.utils.LogUtil;
 import com.lld.saltedfishutils.crypto.jwt.TokenUtil;
 import com.lld.saltedfishutils.date.DateUtil;
 import com.lld.saltedfishutils.entity.SessionInfo;
@@ -45,7 +45,7 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
     //用户服务
     private SysUserService userService;
     //登陆日志工具
-    private final LoginLogUtil loginLogUtil;
+    private final LogUtil logUtil;
     //lua脚本管理
     private final LuaScriptManager luaScriptManager;
 
@@ -58,12 +58,12 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
 
 
     public LoginSuccessHandler(ObjectMapper objectMapper, RedisUtil redisUtil, SysUserService userService,
-                               LoginLogUtil loginLogUtil, LuaScriptManager luaScriptManager, StringRedisTemplate stringRedisTemplate,
+                               LogUtil logUtil, LuaScriptManager luaScriptManager, StringRedisTemplate stringRedisTemplate,
                                TokenUtil tokenUtil) {
         this.objectMapper = objectMapper;
         this.redisUtil = redisUtil;
         this.userService = userService;
-        this.loginLogUtil = loginLogUtil;
+        this.logUtil = logUtil;
         this.luaScriptManager = luaScriptManager;
         this.stringRedisTemplate = stringRedisTemplate;
         this.tokenUtil = tokenUtil;
@@ -91,7 +91,7 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
             logMessage = String.format("%s因多次登录失败已被锁定，%s后可重试", subject, timeInfo);
 
 
-            loginLogUtil.logFailureLoginAsync(sysUser.getUsername(), IpUtil.getClientRealIp(request), "账密验证成功,但" + logMessage);
+            //logUtil.logFailureLoginAsync(sysUser.getUsername(), IpUtil.getClientRealIp(request), "账密验证成功,但" + logMessage);
 
             try (ServletOutputStream outputStream = response.getOutputStream()) {
                 String result = objectMapper.writeValueAsString(ReturnResult.error(errorMessage));
@@ -103,9 +103,9 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
 
 
         sysUser.setPassWord(null);
+        //更新数据库登录时间
         Date loginDate = new Date();
         sysUser.setLoginDate(loginDate);
-        //更新数据库登录时间
         //这里有点蠢的，最好还是用消息中间件 ，用另一个程序处理，这里有点影响登录效率了
         userService.updateLoginDate(sysUser.getId(), loginDate);
 
@@ -124,7 +124,7 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
         webUserInfo.setUserName(sysUser.getUsername());
 
         //异步记录登陆日志
-        loginLogUtil.logUserLoginAsync(sysUser.getId(), sysUser.getUsername(), IpUtil.getClientRealIp(request));
+        //logUtil.logUserLoginAsync(sysUser.getId(), sysUser.getUsername(), IpUtil.getClientRealIp(request));
 
         try (ServletOutputStream outputStream = response.getOutputStream()) {
             String result = objectMapper.writeValueAsString(ReturnResult.OK(webUserInfo));

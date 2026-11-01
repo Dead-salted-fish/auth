@@ -2,7 +2,7 @@ package com.lld.auth.security.PasswordEncoder;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.util.*;
+import java.util.Map;
 
 public class RandomPasswordEncoder implements PasswordEncoder {
 
@@ -16,6 +16,7 @@ public class RandomPasswordEncoder implements PasswordEncoder {
         this.passwordEncoderMap = passwordEncoderMap;
     }
 
+    // 编码密码
     @Override
     public String encode(CharSequence charSequence) {
 
@@ -26,6 +27,9 @@ public class RandomPasswordEncoder implements PasswordEncoder {
         return PREFIX + encoderType + SUFFIX+passWordEncoded;
     }
 
+    // 验证密码
+    // rawPassword 是用户输入的密码, prefixEncodedPassword 是数据库中存储的密码
+    // {加密方式}加密后的密码  如 {bcrypt}$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG
     @Override
     public boolean matches(CharSequence rawPassword, String prefixEncodedPassword) {
 
@@ -43,6 +47,7 @@ public class RandomPasswordEncoder implements PasswordEncoder {
         return passwordEncoder.matches(rawPassword, encodedPassword);
     }
 
+    // 获取加密器类型
     private String extractId(String prefixEncodedPassword) {
         if (prefixEncodedPassword == null) {
             return null;
@@ -58,7 +63,7 @@ public class RandomPasswordEncoder implements PasswordEncoder {
         return prefixEncodedPassword.substring(start + 1, end);
     }
 
-    // 密码平滑升级
+    // 密码平滑升级，暂时走不到这步
     @Override
     public boolean upgradeEncoding(String prefixEncodedPassword) {
         String id = extractId(prefixEncodedPassword);
@@ -66,6 +71,7 @@ public class RandomPasswordEncoder implements PasswordEncoder {
         return this.passwordEncoderMap.get(id).upgradeEncoding(encodedPassword);
     }
 
+    // 从数据库存储的密码中 获取加密后的密码
     private String extractEncodedPassword(String prefixEncodedPassword) {
         int start = prefixEncodedPassword.indexOf(SUFFIX);
         return prefixEncodedPassword.substring(start + 1);

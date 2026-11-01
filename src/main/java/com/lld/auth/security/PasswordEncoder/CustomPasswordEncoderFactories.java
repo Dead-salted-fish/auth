@@ -9,18 +9,15 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 自定义密码编码器工厂 (Spring Security 5.7+ 推荐写法)
- * 使用 DelegatingPasswordEncoder 替代自定义实现，支持多种加密算法
+ * 自定义密码编码器工厂
  */
 public class CustomPasswordEncoderFactories {
 
 
     /**
-     * 创建随机选择编码器的 PasswordEncoder (保留原有功能)
-     * 每次编码时随机选择一种算法，用于测试或特殊场景
-     *
-     * @return RandomPasswordEncoder 实例
-     *
+     * 原本这里想的是，一次加入多种加密手段，每次加密使用随机的 Encoder
+     * 鉴于 其他的Encoder都不好用， RandomPasswordEncoder 中加密时，指定了 bcrypt 为固定的加密器
+     * 别的加密器不删是为了 兼容老用户的随机加密
      */
 
     public static RandomPasswordEncoder createRandomPasswordEncoder() {
