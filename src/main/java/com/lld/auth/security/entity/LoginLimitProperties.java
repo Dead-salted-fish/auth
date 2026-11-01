@@ -17,7 +17,7 @@ public class LoginLimitProperties {
     /**
      * IP登录最大失败次数
      */
-    @Value("${security.login.limit.ipMaxFailures:5}")
+    @Value("${security.login.limit.ipMaxFailures:50}")
     private int ipMaxFailures;
     /**
      * 锁定时间（秒）
@@ -29,6 +29,14 @@ public class LoginLimitProperties {
      */
     @Value("${security.login.limit.countExpire:600}")
     private int countExpire;
+
+    /**
+    * 登录限制开关
+     * true 开启  false 关闭 默认开启
+     * 关闭则不会对登录失败做限制
+    * */
+    @Value("${security.login.openlimit:true}")
+    private boolean openLimit;
 
 }
 

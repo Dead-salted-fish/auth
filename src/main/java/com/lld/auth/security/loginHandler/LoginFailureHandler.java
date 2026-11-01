@@ -48,7 +48,7 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
 
     @Override
     public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response, AuthenticationException exception) throws IOException, ServletException {
-        ;
+
         //设置返回状态
         response.setContentType("application/json;charset=utf-8");
         response.setStatus(HttpServletResponse.SC_OK);
@@ -59,8 +59,12 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
         String remoteAddr = IpUtil.getClientRealIp(request);
 
         // 执行Lua脚本，看失败后是否限制 ，失败超过指定次数会被限制登录
-        LoginLimit loginLimit = doRedisCheckAndLimitLua(username, request);
-        Map<String, String> msg = resolveMessage(loginLimit, exception);
+        boolean openLimit = loginLimitProperties.isOpenLimit();
+        LoginLimit loginLimit = null;
+        if(openLimit){
+             loginLimit = doRedisCheckAndLimitLua(username, request);
+        }
+        Map<String, String> msg = resolveMessage(loginLimit, exception,openLimit);
 
         // 获取错误信息与日志信息
         String errorMessage = msg.get("errorMessage");
@@ -68,7 +72,8 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
 
 
         // 记录登录失败日志
-        LogUtil.loginlogger.error("用户名:{},IP:{},登录失败,失败原因:{},剩余尝试次数:{}", username, remoteAddr, logMessage,loginLimit.getRemainingAttempts());
+        LogUtil.loginlogger.error("用户名:{},IP:{},登录失败,失败原因:{},剩余尝试次数:{}", username, remoteAddr, logMessage,
+                loginLimit == null? "限制登录已经关闭" : loginLimit.getRemainingAttempts());
 
         String result = objectMapper.writeValueAsString(ReturnResult.error(errorMessage));
         // 使用try-with-resources自动管理资源
@@ -81,16 +86,17 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
 
 
     // 根据 Redis 锁定状态 / 异常类型，返回 errorMessage 与 logMessage
-    private Map<String, String> resolveMessage(LoginLimit loginLimit, AuthenticationException exception) {
-        String status = loginLimit.getStatus();
-
-        // 最高优先级：Redis 限流锁定
-        if (status.equals("locked") || status.equals("iplocked")) {
-            String timeInfo = formatTime(loginLimit.getLockTtl());
-            String subject = status.equals("iplocked") ? "IP" : "账户";
-            String error = String.format("%s错误次数过多，请%s后重试", subject, timeInfo);
-            String log = String.format("%s因多次登录失败已被锁定，%s后可重试", subject, timeInfo);
-            return Map.of("errorMessage", error, "logMessage", log);
+    private Map<String, String> resolveMessage(LoginLimit loginLimit, AuthenticationException exception, boolean openLimit) {
+        if(openLimit){
+            String status = loginLimit.getStatus();
+            // 最高优先级：Redis 限流锁定
+            if (status.equals("locked") || status.equals("iplocked")) {
+                String timeInfo = formatTime(loginLimit.getLockTtl());
+                String subject = status.equals("iplocked") ? "IP" : "账户";
+                String error = String.format("%s错误次数过多，请%s后重试", subject, timeInfo);
+                String log = String.format("%s因多次登录失败已被锁定，%s后可重试", subject, timeInfo);
+                return Map.of("errorMessage", error, "logMessage", log);
+            }
         }
 
         String logMessage;

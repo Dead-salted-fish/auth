@@ -72,9 +72,6 @@ public class SecurityConfig {
 
     // 白名单
     private static final String[] URL_WHITELIST = {
-            "/login",
-            "/logout",
-            "/hello",
             "/auth/user/register",
             "/auth/user/login",
             "/auth/user/getClientRsaPublicKey",

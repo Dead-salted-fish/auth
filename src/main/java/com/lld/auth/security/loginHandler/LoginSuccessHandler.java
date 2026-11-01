@@ -73,24 +73,27 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
 
         // 检查账户是否因为失败次数过多被锁定
         String username = sysUser.getUsername();
-        String remoteAddr = IpUtil.getClientRealIp(request);
-        LoginLimit loginLimit = doRedisCheckAndLimitLua(username, request);
-        String status = loginLimit.getStatus();
 
-        // 最高优先级：Redis 限流锁定
-        if (status.equals("locked") || status.equals("iplocked")) {
-            String timeInfo = formatTime(loginLimit.getLockTtl());
-            String subject = status.equals("iplocked") ? "IP" : "账户";
-            String  errorMessage = String.format("%s错误次数过多，请%s后重试", subject, timeInfo);
-            String  logMessage = String.format("%s因多次登录失败已被锁定，%s后可重试", subject, timeInfo);
-            // 记录登录失败日志
-            LogUtil.loginlogger.error("用户名:{},IP:{},登录失败,失败原因:{},剩余尝试次数:{}", username, remoteAddr, logMessage,loginLimit.getRemainingAttempts());
-            try (ServletOutputStream outputStream = response.getOutputStream()) {
-                String result = objectMapper.writeValueAsString(ReturnResult.error(errorMessage));
-                outputStream.write(result.getBytes());
-                outputStream.flush();
+        if (loginLimitProperties.isOpenLimit()) {
+            String remoteAddr = IpUtil.getClientRealIp(request);
+            LoginLimit loginLimit = doRedisCheckAndLimitLua(username, request);
+            String status = loginLimit.getStatus();
+
+            // 最高优先级：Redis 限流锁定
+            if (status.equals("locked") || status.equals("iplocked")) {
+                String timeInfo = formatTime(loginLimit.getLockTtl());
+                String subject = status.equals("iplocked") ? "IP" : "账户";
+                String errorMessage = String.format("%s错误次数过多，请%s后重试", subject, timeInfo);
+                String logMessage = String.format("%s因多次登录失败已被锁定，%s后可重试", subject, timeInfo);
+                // 记录登录失败日志
+                LogUtil.loginlogger.error("用户名:{},IP:{},登录失败,失败原因:{},剩余尝试次数:{}", username, remoteAddr, logMessage, loginLimit.getRemainingAttempts());
+                try (ServletOutputStream outputStream = response.getOutputStream()) {
+                    String result = objectMapper.writeValueAsString(ReturnResult.error(errorMessage));
+                    outputStream.write(result.getBytes());
+                    outputStream.flush();
+                }
+                return;
             }
-            return;
         }
 
         //更新数据库登录时间
@@ -107,16 +110,16 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
         String authoritiesStr = sysUser.getAuthorities().stream().
                 map(item -> item.getAuthority()).collect(Collectors.joining(","));
         customClaims.put("authorities", authoritiesStr);
-        Map<String, Object> claims = tokenUtil.generateAccessToken(sysUser.getId(), sysUser.getUsername(), customClaims);
+        Map<String, Object> claims = tokenUtil.generateAccessToken(sysUser.getId(), username, customClaims);
         recordInRedis(claims, sysUser);
 
         //根据用户信息  生成  前端需要的用户数据
         WebUserInfo webUserInfo = MSUserMapper.INSTANCE.toWebUserInfo(sysUser);
         webUserInfo.setToken((String) claims.get("token"));
-        webUserInfo.setUserName(sysUser.getUsername());
+        webUserInfo.setUserName(username);
 
         //异步记录登陆日志
-        LogUtil.loginlogger.info("用户名:{},IP:{},登录成功", sysUser.getUsername(), IpUtil.getClientRealIp(request));
+        LogUtil.loginlogger.info("用户名:{},IP:{},登录成功", username, IpUtil.getClientRealIp(request));
 
         try (ServletOutputStream outputStream = response.getOutputStream()) {
             String result = objectMapper.writeValueAsString(ReturnResult.OK(webUserInfo));
