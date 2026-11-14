@@ -2,16 +2,17 @@ package com.lld.auth.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lld.auth.security.PasswordEncoder.CustomPasswordEncoderFactories;
+import com.lld.auth.security.entity.AuthWhitelist;
 import com.lld.auth.security.filter.CustomUsernamePasswordAuthenticationFilter;
 import com.lld.auth.security.filter.MyAuthenticationEntryPoint;
 import com.lld.auth.security.filter.TokenAuthenticationFilter;
 import com.lld.auth.security.loginHandler.LoginFailureHandler;
 import com.lld.auth.security.loginHandler.LoginSuccessHandler;
 import com.lld.auth.security.userDetails.UserDetailsServiceImpl;
+import com.lld.auth.user.service.SysUserService;
 import com.lld.auth.utils.EncrytedRecordHelper;
-import com.lld.saltedfishutils.crypto.jwt.TokenUtil;
+import com.lld.saltedfishutils.crypto.jwt.TokenValidator;
 import com.lld.saltedfishutils.redis.RedisUtil;
-import com.lld.saltedfishutils.redis.lua.LuaScriptExecutor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -58,10 +59,13 @@ public class SecurityConfig {
     private RedisUtil redisUtil;
 
     @Autowired
-    private TokenUtil tokenUtil;
+    private AuthWhitelist authWhitelist;
 
     @Autowired
-    private LuaScriptExecutor luaScriptExecutor;
+    private TokenValidator tokenValidator;
+
+
+    private SysUserService sysUserService;
 
 
     @Autowired
@@ -70,15 +74,11 @@ public class SecurityConfig {
         this.userDetailsService = userDetailsService;
     }
 
-    // 白名单
-    private static final String[] URL_WHITELIST = {
-            "/auth/user/register",
-            "/auth/user/login",
-            "/auth/user/getClientRsaPublicKey",
-            "/auth/user/getMenus",
-    };
-
-
+    @Autowired
+    @Lazy
+    public void setSysUserService(SysUserService sysUserService) {
+        this.sysUserService = sysUserService;
+    }
 
 
     /**
@@ -141,8 +141,9 @@ public class SecurityConfig {
         TokenAuthenticationFilter tokenAuthenticationFilter = new TokenAuthenticationFilter(authenticationManager,
                 redisUtil,
                 objectMapper,
-                tokenUtil,
-                luaScriptExecutor
+                authWhitelist,
+                tokenValidator,
+                sysUserService
                 );
 
         // Token 处理以及异常处理
@@ -158,7 +159,7 @@ public class SecurityConfig {
         // 注意 这里的拦截 和 @PreAuthorize 注解 是 相互独立的，
         // @PreAuthorize 注解 是 基于方法的 权限控制， 这里是基于 url 的 权限控制
         http.authorizeHttpRequests(auth -> auth
-                .requestMatchers(URL_WHITELIST).permitAll()
+                .requestMatchers(authWhitelist.anonymousArray()).permitAll()
                 .anyRequest().authenticated()
         );
 

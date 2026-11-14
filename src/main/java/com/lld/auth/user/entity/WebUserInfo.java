@@ -28,4 +28,6 @@ public class WebUserInfo {
 
     private String token;
 
+    private String refreshToken;
+
 }

@@ -40,7 +40,11 @@ public interface SysUserService  {
 
     ReturnResult getUserDetailById(Long  id);
 
-    ReturnResult userHeartBeat(Long id, Integer status);
-
     ReturnResult getOnlineStatistics();
+
+    ReturnResult getAccesstoken();
+
+    String getUserAuthorities(String userId);
+
+    ReturnResult getRefreshToken();
 }

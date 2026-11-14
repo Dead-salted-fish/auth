@@ -15,6 +15,7 @@ public class SysUserController {
     @Autowired
     private SysUserService sysUserService;
 
+    @PreAuthorize("permitAll()")
     @PostMapping("/user/register")
     public ReturnResult registerUser(@RequestBody SysUser sysUser) {
         return  sysUserService.registerUser(sysUser);
@@ -29,7 +30,6 @@ public class SysUserController {
     }
 
     @GetMapping("/user/getMenus")
-    @PreAuthorize("permitAll()")
     public ReturnResult getMenus(String token) throws Exception {
         System.out.println("token"+ token);
         return  sysUserService.getMenus();
@@ -86,16 +86,6 @@ public class SysUserController {
 
     }
 
-    /**
-     * 用户心跳，更新用户状态
-     * roles = {"noAuthentication"} 表示不需要权限，但还是要登录的
-     * */
-    @GetMapping("/user/userHeartBeat")
-    public ReturnResult userHeartBeat(Long  id,Integer status) throws Exception {
-
-        return  sysUserService.userHeartBeat(id,status);
-
-    }
 
     /**
      *  获取用户在线数量
@@ -105,6 +95,16 @@ public class SysUserController {
 
         return  sysUserService.getOnlineStatistics();
 
+    }
+
+    @PostMapping("/user/accessToken")
+    public ReturnResult accesstoken() throws Exception {
+        return  sysUserService.getAccesstoken();
+    }
+
+    @PostMapping("/user/refreshToken")
+    public ReturnResult refreshToken() throws Exception {
+        return  sysUserService.getRefreshToken();
     }
 
 }

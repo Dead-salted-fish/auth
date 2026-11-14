@@ -151,8 +151,8 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
     private LoginLimit doRedisCheckAndLimitLua(String username, HttpServletRequest request) {
         String clientRealIp = IpUtil.getClientRealIp(request);
         List<String> keys = Arrays.asList(
-                AuthPublicConstantKeys.USER_LOGIN_FAIL_LOCK_PREFIX + username,
-                AuthPublicConstantKeys.USER_LOGIN_FAIL_COUNT_PREFIX + username,
+                AuthPublicConstantKeys.ACCOUNT_LOGIN_FAIL_LOCK_PREFIX + username,
+                AuthPublicConstantKeys.ACCOUNT_LOGIN_FAIL_COUNT_PREFIX + username,
                 AuthPublicConstantKeys.IP_LOGIN_FAIL_LOCK_PREFIX + clientRealIp,
                 AuthPublicConstantKeys.IP_LOGIN_FAIL_COUNT_PREFIX + clientRealIp
         );

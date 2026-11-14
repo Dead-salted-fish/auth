@@ -102,20 +102,26 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
         sysUser.setLoginDate(loginDate);
         userService.updateLoginDate(sysUser.getId(), loginDate);
 
-        //创建token放入redis
+
         // 更新密码为null
         sysUser.setPassWord(null);
+        // 生成accesstoken 与 refreshtoken
         Map<String, Object> customClaims = new HashMap<>();
         // 将权限转换为字符串
-        String authoritiesStr = sysUser.getAuthorities().stream().
-                map(item -> item.getAuthority()).collect(Collectors.joining(","));
-        customClaims.put("authorities", authoritiesStr);
-        Map<String, Object> claims = tokenUtil.generateAccessToken(sysUser.getId(), username, customClaims);
-        recordInRedis(claims, sysUser);
+        // 考虑到权限可能过多，全部写入会让jwt token 过大，所以暂时放弃写入
+//        String authoritiesStr = sysUser.getAuthorities().stream().
+//                map(item -> item.getAuthority()).collect(Collectors.joining(","));
+//        customClaims.put("authorities", authoritiesStr);
+        customClaims.put("version", sysUser.getVersion());
+        Map<String, Object> accessTokenClaims = tokenUtil.generateAccessToken(sysUser.getId(), username, customClaims);
+        Map<String, Object> refreshTokenClaims = tokenUtil.generateRefreshToken(sysUser.getId(), username, customClaims);
+        //将创建token放入redis
+        recordInRedis(refreshTokenClaims, sysUser);
 
         //根据用户信息  生成  前端需要的用户数据
         WebUserInfo webUserInfo = MSUserMapper.INSTANCE.toWebUserInfo(sysUser);
-        webUserInfo.setToken((String) claims.get("token"));
+        webUserInfo.setToken((String) accessTokenClaims.get("token"));
+        webUserInfo.setRefreshToken((String) refreshTokenClaims.get("token"));
         webUserInfo.setUserName(username);
 
         //异步记录登陆日志
@@ -153,8 +159,8 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
     private LoginLimit doRedisCheckAndLimitLua(String username, HttpServletRequest request) {
         String clientRealIp = IpUtil.getClientRealIp(request);
         List<String> keys = Arrays.asList(
-                AuthPublicConstantKeys.USER_LOGIN_FAIL_LOCK_PREFIX + username,
-                AuthPublicConstantKeys.USER_LOGIN_FAIL_COUNT_PREFIX + username,
+                AuthPublicConstantKeys.ACCOUNT_LOGIN_FAIL_LOCK_PREFIX + username,
+                AuthPublicConstantKeys.ACCOUNT_LOGIN_FAIL_COUNT_PREFIX + username,
                 AuthPublicConstantKeys.IP_LOGIN_FAIL_LOCK_PREFIX + clientRealIp,
                 AuthPublicConstantKeys.IP_LOGIN_FAIL_COUNT_PREFIX + clientRealIp
         );
@@ -180,20 +186,21 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
     /**
      * 登录成功后redis记录信息
      */
-    private void recordInRedis(Map<String, Object> claims, SysUser sysUser) throws JsonProcessingException {
-        // redis 用户token存放的key
-        String redisTokenKey = PublicConstantKeys.Redis_User_Token_Prefix + sysUser.getId();
+    private void recordInRedis( Map<String, Object> refreshTokenClaims, SysUser sysUser) throws JsonProcessingException {
+
+        // redis 用户refresh token存放的key
+        String redisRefreshTokenKey = PublicConstantKeys.Redis_User_Refresh_Token_Prefix + sysUser.getId();
         // redis 中用户版本号
         String redisVersionKey = PublicConstantKeys.Redis_User_Version_Prefix + sysUser.getId();
         // redis 记录当日 登陆过的用户 位图的key
-        String todayOnlineBitmapKey = AuthPublicConstantKeys.USER_LOGGED_BITMAP_PREFIX + DateUtil.formatDate(new Date(), DATE_PATTERN);
+        String dailyActiveBitmapKey = AuthPublicConstantKeys.DAILY_ACTIVE_USERS_PREFIX + DateUtil.formatDate(new Date(), DATE_PATTERN);
 
-        SessionInfo sessionInfo = SessionInfo.builder()
-                .jti(String.valueOf(claims.get("jti")))
+        SessionInfo refreshSessionInfo = SessionInfo.builder()
+                .jti(String.valueOf(refreshTokenClaims.get("jti")))
                 .userId(String.valueOf(sysUser.getId()))
                 .userName(sysUser.getUsername())
                 .loginTime(sysUser.getLoginDate().getTime())
-                .expireTime((Long) claims.get("expirationTime"))
+                .expireTime((Long) refreshTokenClaims.get("expirationTime"))
                 .version(sysUser.getVersion())
                 .authority(sysUser.getAuthorities()
                         .stream()
@@ -202,20 +209,19 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
                 .build();
 
         List<String> keys = Arrays.asList(
-                redisTokenKey,
-                redisVersionKey,//tokenKey  用户token
-                AuthPublicConstantKeys.ONLINE_BITMAP_KEY,   //onlineBitmapKey 在线用户bitmap
-                AuthPublicConstantKeys.ACTIVITY_ZSET_KEY,  //activityZsetKey 活跃用户zset  已经废弃，后面换其统计方式
-                todayOnlineBitmapKey
+                redisVersionKey,//redis 中用户版本号
+                dailyActiveBitmapKey, //当日活跃过用户bitmap
+                redisRefreshTokenKey //refreshTokenKey 用户refresh token 的 key
         );
 
         // 修改 ARGV 为 List<String> 类型
         String[] argv = {
-                String.valueOf(claims.get("jti")), //用户token的jit值
                 sysUser.getVersion() == null ? "0" : sysUser.getVersion(),//用户版本号
-                objectMapper.writeValueAsString(sessionInfo), //用户token的值
                 String.valueOf(PublicConstantKeys.User_Token_Expire_Seconds), //用户token的过期时间
+                String.valueOf(refreshTokenClaims.get("jti")), //refreshtoken的jit值
+                objectMapper.writeValueAsString(refreshSessionInfo) ,//用户refresh token的值
                 String.valueOf(sysUser.getId()) //用户id
+
         };
 
         List<Object> result = luaScriptExecutor.execute("user_login", List.class, keys, argv);

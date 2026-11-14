@@ -1,13 +1,11 @@
 package com.lld.auth.user.service.impl;
 
-import com.lld.auth.redis.lua.LuaScriptManager;
 import com.lld.auth.user.entity.CleanupResult;
 import com.lld.auth.user.entity.OnlineStatistics;
 import com.lld.auth.user.entity.UserCleanupDetail;
 import com.lld.auth.user.service.LuaOnlineUserService;
 import com.lld.auth.utils.AuthPublicConstantKeys;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.script.RedisScript;
+import com.lld.saltedfishutils.redis.lua.LuaScriptExecutor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -24,12 +22,10 @@ public class LuaOnlineUserServiceImpl implements LuaOnlineUserService {
     private static final String DATE_PATTERN = "yyyy-MM-dd";
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern(DATE_PATTERN);
 
+    private LuaScriptExecutor luaScriptExecutor;
 
-    private final LuaScriptManager luaScriptManager;
-    private final StringRedisTemplate stringRedisTemplate; // 添加StringRedisTemplate
-    public LuaOnlineUserServiceImpl(LuaScriptManager luaScriptManager, StringRedisTemplate stringRedisTemplate) {
-        this.luaScriptManager = luaScriptManager;
-        this.stringRedisTemplate = stringRedisTemplate;
+    public LuaOnlineUserServiceImpl(LuaScriptExecutor luaScriptExecutor) {
+        this.luaScriptExecutor = luaScriptExecutor;
 
     }
 
@@ -47,7 +43,7 @@ public class LuaOnlineUserServiceImpl implements LuaOnlineUserService {
         long currentTime = System.currentTimeMillis();
 
         List<String> keys = Arrays.asList(
-                AuthPublicConstantKeys.ONLINE_BITMAP_KEY,
+                AuthPublicConstantKeys.ONLINE_USERS_KEY,
                 AuthPublicConstantKeys.ACTIVITY_ZSET_KEY
         );
 
@@ -58,15 +54,11 @@ public class LuaOnlineUserServiceImpl implements LuaOnlineUserService {
                 String.valueOf(maxProcess)
         };
 
-        RedisScript<List> cleanupScript = luaScriptManager.getCleanupScript();
 
 
 
         @SuppressWarnings("unchecked")
-        List<Object> result = (List<Object>) stringRedisTemplate.execute(
-                cleanupScript,
-                keys,argv
-        );
+        List<Object> result =  luaScriptExecutor.execute("cleanup_online_users",List.class, keys, argv);
 
         return parseCleanupResult(result);
     }
@@ -77,16 +69,13 @@ public class LuaOnlineUserServiceImpl implements LuaOnlineUserService {
     public OnlineStatistics getOnlineStatistics() {
         String todayStr = LocalDate.now().format(DATE_FORMATTER);
         List<String> keys = Arrays.asList(
-                AuthPublicConstantKeys.ONLINE_BITMAP_KEY,
-                 AuthPublicConstantKeys.USER_LOGGED_BITMAP_PREFIX+todayStr
+                AuthPublicConstantKeys.ONLINE_USERS_KEY,
+                 AuthPublicConstantKeys.DAILY_ACTIVE_USERS_PREFIX+todayStr
 
         );
 
         @SuppressWarnings("unchecked")
-        List<Object> result = (List<Object>) stringRedisTemplate.execute(
-                luaScriptManager.getStatsScript(),
-                keys, new String[]{}
-        );
+        List<Object> result =  luaScriptExecutor.execute("online_statistics",List.class, keys);
 
         return parseStatisticsResult(result);
     }

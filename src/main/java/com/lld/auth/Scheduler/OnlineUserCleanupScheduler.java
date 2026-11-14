@@ -16,58 +16,58 @@ import java.util.concurrent.atomic.LongAdder;
 @Component
 public class OnlineUserCleanupScheduler {
 
-    @Autowired
-    private LuaOnlineUserService onlineUserService;
-
-    private final LongAdder totalCleaned = new LongAdder();
-    private final LongAdder totalTime = new LongAdder();
-
-    private static final Logger logger = LoggerFactory.getLogger(OnlineUserCleanupScheduler.class);
-    /**
-     * 每30分钟执行一次清理
-     */
-    @Scheduled(fixedRate = 1800000)
-    public void scheduledCleanup() {
-        System.out.println("开始清理用户");
-        long startTime = System.currentTimeMillis();
-
-        try {
-            CleanupResult result = onlineUserService.cleanupTimeoutUsers();
-
-            long duration = System.currentTimeMillis() - startTime;
-            totalCleaned.add(result.getTotalRemoved());
-            totalTime.add(duration);
-
-            List<UserCleanupDetail> details = result.getDetails();
-            StringBuffer clearUser = new StringBuffer();
-            for (UserCleanupDetail detail : details) {
-                clearUser.append(detail.getUserId()).append(",");
-            }
-            String clearUserStr = "无清理用户";
-            if(clearUser.length() > 1){
-                 clearUserStr = clearUser.substring(0, clearUser.length()-1);
-            }
-
-
-            logger.warn("清理用户: {}", clearUserStr);
-
-            logger.warn("清理完成: 总数={}, 耗时={}ms",
-                    result.getTotalRemoved(),
-                    duration);
-
-            // 监控告警
-            if (duration > 5000) {
-                logger.warn("清理任务执行缓慢: {}ms", duration);
-            }
-
-            if (result.getTotalRemoved() > 1000) {
-                logger.info("批量清理了大量用户: {}", result.getTotalRemoved());
-            }
-
-        } catch (Exception e) {
-            logger.error("清理任务执行失败", e);
-        }
-    }
+//    @Autowired
+//    private LuaOnlineUserService onlineUserService;
+//
+//    private final LongAdder totalCleaned = new LongAdder();
+//    private final LongAdder totalTime = new LongAdder();
+//
+//    private static final Logger logger = LoggerFactory.getLogger(OnlineUserCleanupScheduler.class);
+//    /**
+//     * 每30分钟执行一次清理
+//     */
+//    @Scheduled(fixedRate = 1800000)
+//    public void scheduledCleanup() {
+//        System.out.println("开始清理用户");
+//        long startTime = System.currentTimeMillis();
+//
+//        try {
+//            CleanupResult result = onlineUserService.cleanupTimeoutUsers();
+//
+//            long duration = System.currentTimeMillis() - startTime;
+//            totalCleaned.add(result.getTotalRemoved());
+//            totalTime.add(duration);
+//
+//            List<UserCleanupDetail> details = result.getDetails();
+//            StringBuffer clearUser = new StringBuffer();
+//            for (UserCleanupDetail detail : details) {
+//                clearUser.append(detail.getUserId()).append(",");
+//            }
+//            String clearUserStr = "无清理用户";
+//            if(clearUser.length() > 1){
+//                 clearUserStr = clearUser.substring(0, clearUser.length()-1);
+//            }
+//
+//
+//            logger.warn("清理用户: {}", clearUserStr);
+//
+//            logger.warn("清理完成: 总数={}, 耗时={}ms",
+//                    result.getTotalRemoved(),
+//                    duration);
+//
+//            // 监控告警
+//            if (duration > 5000) {
+//                logger.warn("清理任务执行缓慢: {}ms", duration);
+//            }
+//
+//            if (result.getTotalRemoved() > 1000) {
+//                logger.info("批量清理了大量用户: {}", result.getTotalRemoved());
+//            }
+//
+//        } catch (Exception e) {
+//            logger.error("清理任务执行失败", e);
+//        }
+//    }
 
 //    /**
 //     * 每小时报告统计信息

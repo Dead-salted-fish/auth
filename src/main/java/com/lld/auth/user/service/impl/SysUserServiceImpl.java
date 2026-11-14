@@ -1,6 +1,5 @@
 package com.lld.auth.user.service.impl;
 
-import com.lld.auth.redis.lua.LuaScriptManager;
 import com.lld.auth.security.entity.MyUsernamePasswordAuthenticationToken;
 import com.lld.auth.user.entity.*;
 import com.lld.auth.user.entity.DTO.SysUserDto;
@@ -12,12 +11,15 @@ import com.lld.auth.user.repository.SysUserRepository;
 import com.lld.auth.user.service.*;
 import com.lld.auth.utils.AuthPublicConstantKeys;
 import com.lld.auth.utils.SecurityUserUtils;
+import com.lld.saltedfishutils.crypto.jwt.TokenUtil;
 import com.lld.saltedfishutils.entity.WebComponentVO.SelectOptionVO;
 import com.lld.saltedfishutils.redis.RedisUtil;
 import com.lld.saltedfishutils.web.result.ReturnResult;
 import com.lld.saltedfishutils.crypto.RSAUtil;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -54,23 +56,23 @@ public class SysUserServiceImpl implements SysUserService {
     private RedisUtil redisUtil;
     // lua在线用户服务
     private LuaOnlineUserService luaOnlineUserService;
-    // lua脚本管理器
-    private LuaScriptManager luaScriptManager;
+
     // stringRedisTemplate
     private StringRedisTemplate stringRedisTemplate;
     //SysUserRepository
     private SysUserRepository sysUserRepository;
 
     private IUserRoleService userRoleService;
+    private TokenUtil tokenUtil;
 
     private static final String DATE_PATTERN = "yyyy-MM-dd";
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern(DATE_PATTERN);
 
     public SysUserServiceImpl(SysUserMapper sysUserMapper, EncryptedRecordsMapper encryptedRecordsMapper,
                               PasswordEncoder passwordEncoder, SysMenuService sysMenuService, SysRoleService sysRoleService,
-                              RedisUtil redisUtil, LuaOnlineUserService luaOnlineUserService, LuaScriptManager luaScriptManager,
+                              RedisUtil redisUtil, LuaOnlineUserService luaOnlineUserService,
                               StringRedisTemplate stringRedisTemplate, SysUserRepository sysUserRepository,
-                              IUserRoleService userRoleService) {
+                              IUserRoleService userRoleService, TokenUtil tokenUtil) {
         this.sysUserMapper = sysUserMapper;
         this.encryptedRecordsMapper = encryptedRecordsMapper;
         this.passwordEncoder = passwordEncoder;
@@ -78,10 +80,10 @@ public class SysUserServiceImpl implements SysUserService {
         this.sysRoleService = sysRoleService;
         this.redisUtil = redisUtil;
         this.luaOnlineUserService = luaOnlineUserService;
-        this.luaScriptManager = luaScriptManager;
         this.stringRedisTemplate = stringRedisTemplate;
         this.sysUserRepository = sysUserRepository;
         this.userRoleService = userRoleService;
+        this.tokenUtil = tokenUtil;
     }
 
 
@@ -103,7 +105,7 @@ public class SysUserServiceImpl implements SysUserService {
         sysUser.setCreateTime(date);
         sysUser.setUpdateTime(date);
         // 设置默认角色为3，普通用户
-        userRoleService.updateUserRoles(sysUser.getId(),"3",new Date());
+        userRoleService.updateUserRoles(sysUser.getId(), "3", new Date());
         sysUserRepository.insertSingle(sysUser);
         return ReturnResult.OK();
     }
@@ -116,13 +118,14 @@ public class SysUserServiceImpl implements SysUserService {
 
     /**
      * 获取加密公钥
-     * **/
+     *
+     **/
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ReturnResult getClientRsaPublicKey() throws Exception {
         //先看数据库是否有最新的公私钥
         EncryptedRecords latestRecored = encryptedRecordsMapper.selectLatestEncryptedRecord();
-        if(latestRecored != null){
+        if (latestRecored != null) {
             latestRecored.setClientRsaPrivatekey(null);
             return ReturnResult.OK(latestRecored);
         }
@@ -170,47 +173,50 @@ public class SysUserServiceImpl implements SysUserService {
             //单独设置userName字段
             sysUserVo.setUserName(sysUser.getUsername());
             //设置角色名称
-            setSysUserVoSomeFields(rolesMap,sysUserVo,userRolesMap.get(sysUser.getId()));
+            setSysUserVoSomeFields(rolesMap, sysUserVo, userRolesMap.get(sysUser.getId()));
 
             sysUserVos.add(sysUserVo);
         }
 
         return ReturnResult.OK(sysUserVos);
     }
+
     /**
      * 对sysUserVo某些字段进行补充
-     * **/
-    public void setSysUserVoSomeFields(Map<Long, String> rolesMap ,SysUserVo sysUserVo,List<Long> roleIds){
+     *
+     **/
+    public void setSysUserVoSomeFields(Map<Long, String> rolesMap, SysUserVo sysUserVo, List<Long> roleIds) {
 
         StringBuilder roleBuilder = new StringBuilder();
-        if(!CollectionUtils.isEmpty(roleIds)){
+        if (!CollectionUtils.isEmpty(roleIds)) {
             for (Long roleId : roleIds) {
                 roleBuilder.append(rolesMap.get(roleId)).append(",");
             }
-            sysUserVo.setRolesStr(roleBuilder.substring(0,roleBuilder.length()-1).toString());
+            sysUserVo.setRolesStr(roleBuilder.substring(0, roleBuilder.length() - 1).toString());
         }
         //设置状态名称
-        sysUserVo.setStatusStr(sysUserVo.getStatus().equals("1")?"正常":"禁用");
+        sysUserVo.setStatusStr(sysUserVo.getStatus().equals("1") ? "正常" : "禁用");
     }
 
     @Override
     public ReturnResult getUserRolesTree() {
         List<SelectOptionVO> selectOptionVOS = new ArrayList<>();
 //        selectOptionVOS.add(new SelectOptionVO("超级管理员","1","1",null));
-        selectOptionVOS.add(new SelectOptionVO("管理员","2","2",null));
-        selectOptionVOS.add(new SelectOptionVO("普通用户","3","3",null));
-        selectOptionVOS.add(new SelectOptionVO("剑三er","4","4",null));
-        selectOptionVOS.add(new SelectOptionVO("谋定天下er","5","5",null));
+        selectOptionVOS.add(new SelectOptionVO("管理员", "2", "2", null));
+        selectOptionVOS.add(new SelectOptionVO("普通用户", "3", "3", null));
+        selectOptionVOS.add(new SelectOptionVO("剑三er", "4", "4", null));
+        selectOptionVOS.add(new SelectOptionVO("谋定天下er", "5", "5", null));
 
         return ReturnResult.OK(selectOptionVOS);
     }
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ReturnResult addUser(SysUserDto sysUserDto) {
-        MyUsernamePasswordAuthenticationToken authentication = (MyUsernamePasswordAuthenticationToken)SecurityContextHolder.getContext().getAuthentication();
+        MyUsernamePasswordAuthenticationToken authentication = (MyUsernamePasswordAuthenticationToken) SecurityContextHolder.getContext().getAuthentication();
         Long userId = authentication.getUserId();
         SysUser byUserName = sysUserMapper.getByUserName(sysUserDto.getUserName());
-        if(byUserName != null){
+        if (byUserName != null) {
             throw new RuntimeException("用户名已存在");
         }
         SysUser sysUser = msUserMapper.SysUserDtoToSysUser(sysUserDto);
@@ -223,23 +229,23 @@ public class SysUserServiceImpl implements SysUserService {
         sysUser.setUpdateTime(now);
         // 检查用户是否是超级管理员
         Boolean superAdmin = Arrays.asList(sysUserDto.getRoles().split(",")).contains("1");
-        if(superAdmin){
+        if (superAdmin) {
             throw new RuntimeException("用户暂时不能赋予超级管理员权限");
         }
         // 新增用户 更新用户角色
         sysUserMapper.insertSingle(sysUser);
-        userRoleService.updateUserRoles(sysUser.getId(),sysUserDto.getRoles(),now);
+        userRoleService.updateUserRoles(sysUser.getId(), sysUserDto.getRoles(), now);
         return ReturnResult.OK();
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ReturnResult updateUser(SysUserDto sysUserDto) {
-        MyUsernamePasswordAuthenticationToken authentication = (MyUsernamePasswordAuthenticationToken)SecurityContextHolder.getContext().getAuthentication();
+        MyUsernamePasswordAuthenticationToken authentication = (MyUsernamePasswordAuthenticationToken) SecurityContextHolder.getContext().getAuthentication();
         Long userId = authentication.getUserId();
         SysUser sysUser = msUserMapper.SysUserDtoToSysUser(sysUserDto);
         Boolean superAdmin = Arrays.asList(sysUserDto.getRoles().split(",")).contains("1");
-        if(superAdmin){
+        if (superAdmin) {
             throw new RuntimeException("用户暂时不能赋予超级管理员权限");
         }
         sysUser.setUpdater(userId);
@@ -247,11 +253,11 @@ public class SysUserServiceImpl implements SysUserService {
         sysUser.setUpdateTime(now);
         // 更新用户
         int i = sysUserMapper.updateUserById(sysUser);
-        if(i == 0){
+        if (i == 0) {
             return ReturnResult.error("未找到用户");
         }
         // 更新用户角色
-        userRoleService.updateUserRoles(sysUser.getId(),sysUserDto.getRoles(),now);
+        userRoleService.updateUserRoles(sysUser.getId(), sysUserDto.getRoles(), now);
         return ReturnResult.OK();
     }
 
@@ -259,7 +265,7 @@ public class SysUserServiceImpl implements SysUserService {
     public ReturnResult getUserById(Long id) {
         SysUser sysUser = sysUserRepository.selectById(id);
         List<UserRole> userRolesByUserIds = userRoleService.getUserRolesByUserIds(List.of(id));
-        if(sysUser != null){
+        if (sysUser != null) {
             SysUserVo sysUserVo = msUserMapper.SysUserToSysUserVo(sysUser);
             sysUserVo.setUserName(sysUser.getUsername());
             sysUserVo.setRoles(userRolesByUserIds.stream()
@@ -277,7 +283,7 @@ public class SysUserServiceImpl implements SysUserService {
     public ReturnResult deleteById(SysUserDto sysUserDto) {
         Long userId = sysUserDto.getId();
         int delete = sysUserRepository.deleteById(userId);
-        if (delete == 0){
+        if (delete == 0) {
             return ReturnResult.error("未找到用户");
         }
         userRoleService.deleteUserRolesByUserId(userId);
@@ -286,31 +292,34 @@ public class SysUserServiceImpl implements SysUserService {
 
     /**
      * 根据用户id获取用户角色
-     * **/
+     *
+     **/
     @Override
     public List<String> getRolesByUserId(Long userId) {
         List<UserRole> userRolesByUserIds = userRoleService.getUserRolesByUserIds(List.of(userId));
         //获取角色名称
-        List<SysRole> roles= sysRoleService.getAllRoles();
+        List<SysRole> roles = sysRoleService.getAllRoles();
 
         // 获取用户的角色名
-        return  userRolesByUserIds.stream().
-                map(userRole ->{
-                           return roles.stream()
-                                   .filter(role -> role.getId().equals(userRole.getRoleId()))
-                                   .map(SysRole::getRole)
-                                   .findFirst()
-                                   .orElse(null);
+        return userRolesByUserIds.stream().
+                map(userRole -> {
+                            return roles.stream()
+                                    .filter(role -> role.getId().equals(userRole.getRoleId()))
+                                    .map(SysRole::getRole)
+                                    .findFirst()
+                                    .orElse(null);
                         }
 
                 ).collect(Collectors.toList());
 
     }
+
     /**
      * 根据用户id获取用户详情
-     * */
+     *
+     */
     @Override
-    public ReturnResult getUserDetailById(Long  userId) {
+    public ReturnResult getUserDetailById(Long userId) {
         SysUser sysUser = sysUserMapper.selectById(userId);
         SysUserVo sysUserVo = msUserMapper.SysUserToSysUserVo(sysUser);
         sysUserVo.setUserName(sysUser.getUsername());
@@ -323,40 +332,10 @@ public class SysUserServiceImpl implements SysUserService {
                         Collectors.mapping(UserRole::getRoleId, Collectors.toList())
                 ));
 
-        setSysUserVoSomeFields(rolesMap,sysUserVo,userRolesMap.get(userId));
+        setSysUserVoSomeFields(rolesMap, sysUserVo, userRolesMap.get(userId));
         return ReturnResult.OK(sysUserVo);
     }
 
-    @Override
-    public ReturnResult userHeartBeat(Long id, Integer status) {
-        Long userId = SecurityUserUtils.getCurrentUserId();
-        long currentTimeMillis = System.currentTimeMillis();
-        String todayOnlineBitmapKey = AuthPublicConstantKeys.USER_LOGGED_BITMAP_PREFIX+LocalDate.now().format(DATE_FORMATTER);
-
-        //获取三个key
-        List<String> keys = Arrays.asList(
-                AuthPublicConstantKeys.ONLINE_BITMAP_KEY,   //onlineBitmapKey 在线用户bitmap
-                AuthPublicConstantKeys.ACTIVITY_ZSET_KEY,  //activityZsetKey 活跃用户zset
-                todayOnlineBitmapKey
-        );
-
-        //登录脚本参数
-        String[] argv = {
-
-                String.valueOf(userId), //用户id
-                String.valueOf(currentTimeMillis),
-
-        };
-
-        RedisScript<List> userHeartbeatScript = luaScriptManager.getUserHeartbeatScript();
-
-        List<Object> result = (List<Object>) stringRedisTemplate.execute(
-                userHeartbeatScript,
-                keys, argv
-        );
-
-        return ReturnResult.OK(result);
-    }
 
     @Override
     public ReturnResult getOnlineStatistics() {
@@ -364,6 +343,62 @@ public class SysUserServiceImpl implements SysUserService {
 
         return ReturnResult.OK(onlineStatistics);
     }
+
+    /**
+     * 返回双token 刷新的 accessToken
+     * */
+    @Override
+    public ReturnResult getAccesstoken() {
+        Map<String, Object> accessTokenClaims = generateToken("accessToken");
+        return ReturnResult.OK(accessTokenClaims.get("token"));
+    }
+
+    @Override
+    public String getUserAuthorities(String userId) {
+        // 获取用户角色
+        List<UserRole> userRoles = userRoleService.getUserRolesByUserIds(Collections.singletonList(Long.valueOf(userId)));
+        //  获取所有角色
+        Map<Long, String> roleMap = sysRoleService.getAllRoles().stream()
+                .collect(Collectors.toMap(SysRole::getId, SysRole::getRole));
+
+        List<String> authoritiesStrList = new ArrayList<>();
+        for (UserRole userRole : userRoles) {
+            Long roleId = userRole.getRoleId();
+            authoritiesStrList.add("ROLE_" + roleMap.get(roleId));
+        }
+        return String.join(",", authoritiesStrList);
+
+    }
+
+    /**
+     *  返回双token 刷新的 refreshToken
+     * */
+    @Override
+    public ReturnResult getRefreshToken() {
+
+        Map<String, Object> accessTokenClaims = generateToken("refreshToken");
+        return ReturnResult.OK(accessTokenClaims.get("token"));
+    }
+
+    /** 生成 token  */
+    private Map<String, Object> generateToken(String versionType) {
+        Long currentUserId = SecurityUserUtils.getCurrentUserId();
+        SysUser sysUser = sysUserMapper.selectById(currentUserId);
+        if (sysUser == null) {
+            throw new RuntimeException("未找到用户");
+        }
+
+        Map<String, Object> customClaims = new HashMap<>();
+        customClaims.put("version", sysUser.getVersion());
+        Map<String, Object> accessTokenClaims = null;
+        if (versionType.equals("accessToken")) {
+            accessTokenClaims = tokenUtil.generateAccessToken(sysUser.getId(), sysUser.getUsername(), customClaims);
+        } else if (versionType.equals("refreshToken")) {
+            accessTokenClaims = tokenUtil.generateRefreshToken(sysUser.getId(), sysUser.getUsername(), customClaims);
+        }
+        return accessTokenClaims;
+    }
+
 
     private void checkRegisterUser(SysUser sysUser) {
         if (sysUser.getUsername() == null || sysUser.getUsername().length() == 0) {
@@ -374,13 +409,13 @@ public class SysUserServiceImpl implements SysUserService {
         }
         if (sysUser.getEmail() == null || sysUser.getEmail().length() == 0) {
             throw new RuntimeException("邮箱不能为空");
-        }else {
-             final String EMAIL_PATTERN = "^\\S+@\\S+\\.\\S+$";
+        } else {
+            final String EMAIL_PATTERN = "^\\S+@\\S+\\.\\S+$";
             Pattern pattern = Pattern.compile(EMAIL_PATTERN);
             Matcher matcher = pattern.matcher(sysUser.getEmail());
 
             // 使用matcher的matches方法进行完整字符串匹配
-            if(!matcher.matches()){
+            if (!matcher.matches()) {
                 throw new RuntimeException("邮箱格式不正确");
             }
 
