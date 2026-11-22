@@ -103,8 +103,15 @@ public class CustomUsernamePasswordAuthenticationFilter extends AbstractAuthenti
      * */
     private  Map<String, String> decryptUserAndPassword(String username, String password,String webAesKey,String clientRsaId) throws Exception {
 
-        EncryptedRecords clientRsaRecords = encrytedRecordHelper.getEncryptedRecords(Long.valueOf(clientRsaId));
-        byte[] bytes = RSAUtil.decryptByPrivateKey(Base64.getDecoder().decode(webAesKey), clientRsaRecords.getClientRsaPrivatekey());
+        Long keyId;
+        try {
+            keyId = Long.valueOf(clientRsaId);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("clientRsaId 不是合法数字", e);
+        }
+
+        String privateKeyPem =  encrytedRecordHelper.getPrivateKeyPem(Long.valueOf(clientRsaId));
+        byte[] bytes = RSAUtil.decryptByPrivateKey(Base64.getDecoder().decode(webAesKey), privateKeyPem);
         String  decryptWebAesKey = new String(bytes);
 
         Map<String, String> map = new HashMap<>();

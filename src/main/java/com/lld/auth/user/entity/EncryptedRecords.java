@@ -69,6 +69,8 @@ public class EncryptedRecords implements Serializable {
     /**
      * 0 表示旧的
      * 1 表示最新的
+     *
+     * 3 表示被标记为泄露的
      */
     @TableField(value = "status")
     private Integer status;

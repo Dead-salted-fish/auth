@@ -13,9 +13,17 @@ import org.apache.ibatis.annotations.Param;
 */
 @Mapper
 public interface EncryptedRecordsMapper extends BaseMapper<EncryptedRecords> {
-   int  addEncryptedRecord(@Param("encryptedRecords") EncryptedRecords encryptedRecords);
 
+    int addEncryptedRecord(@Param("encryptedRecords") EncryptedRecords encryptedRecords);
+
+    /** 只返回唯一的 active(type=0,status=1)，ORDER BY + LIMIT 1 兜底 */
     EncryptedRecords selectLatestEncryptedRecord();
+
+    /** 轮换：把当前 active 置为历史(status=0)，不删除、不改动私钥列 */
+    int retireActiveRsaKey();
+
+    /** 应急：标记某把密钥已泄露(status=3) */
+    int markCompromised(@Param("id") Long id);
 }
 
 

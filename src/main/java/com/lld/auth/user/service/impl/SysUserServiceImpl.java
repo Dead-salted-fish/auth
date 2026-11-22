@@ -3,6 +3,7 @@ package com.lld.auth.user.service.impl;
 import com.lld.auth.security.entity.MyUsernamePasswordAuthenticationToken;
 import com.lld.auth.user.entity.*;
 import com.lld.auth.user.entity.DTO.SysUserDto;
+import com.lld.auth.user.entity.VO.ClientRsaPublicKeyVO;
 import com.lld.auth.user.entity.VO.SysUserVo;
 import com.lld.auth.user.mapper.EncryptedRecordsMapper;
 import com.lld.auth.user.mapper.SysUserMapper;
@@ -12,10 +13,14 @@ import com.lld.auth.user.service.*;
 import com.lld.auth.utils.AuthPublicConstantKeys;
 import com.lld.auth.utils.SecurityUserUtils;
 import com.lld.saltedfishutils.crypto.jwt.TokenUtil;
+import com.lld.saltedfishutils.crypto.kek.KekEnvelope;
 import com.lld.saltedfishutils.entity.WebComponentVO.SelectOptionVO;
 import com.lld.saltedfishutils.redis.RedisUtil;
 import com.lld.saltedfishutils.web.result.ReturnResult;
 import com.lld.saltedfishutils.crypto.RSAUtil;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.security.core.GrantedAuthority;
@@ -29,6 +34,7 @@ import org.springframework.util.CollectionUtils;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -60,19 +66,32 @@ public class SysUserServiceImpl implements SysUserService {
     // stringRedisTemplate
     private StringRedisTemplate stringRedisTemplate;
     //SysUserRepository
+    // SysUserRepository
     private SysUserRepository sysUserRepository;
 
     private IUserRoleService userRoleService;
     private TokenUtil tokenUtil;
 
+    private final KekEnvelope kekEnvelope;
+
     private static final String DATE_PATTERN = "yyyy-MM-dd";
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern(DATE_PATTERN);
+
+    private final RedissonClient redissonClient;
+
+    /** 全局固定的锁名：所有 auth 实例共享同一把锁；此时还没有 keyId，不能用 id 拼 key */
+    private static final String ACTIVE_RSA_LOCK = "lock:auth:active-rsa-key";
+
+    /** 等待锁的时间，要覆盖一次 2048 位 RSA 生成 + insert 的耗时 */
+    private static final long LOCK_WAIT_SECONDS = 10;
+
 
     public SysUserServiceImpl(SysUserMapper sysUserMapper, EncryptedRecordsMapper encryptedRecordsMapper,
                               PasswordEncoder passwordEncoder, SysMenuService sysMenuService, SysRoleService sysRoleService,
                               RedisUtil redisUtil, LuaOnlineUserService luaOnlineUserService,
                               StringRedisTemplate stringRedisTemplate, SysUserRepository sysUserRepository,
-                              IUserRoleService userRoleService, TokenUtil tokenUtil) {
+                              IUserRoleService userRoleService, TokenUtil tokenUtil,
+                              KekEnvelope kekEnvelope, RedissonClient redissonClient) {
         this.sysUserMapper = sysUserMapper;
         this.encryptedRecordsMapper = encryptedRecordsMapper;
         this.passwordEncoder = passwordEncoder;
@@ -84,6 +103,8 @@ public class SysUserServiceImpl implements SysUserService {
         this.sysUserRepository = sysUserRepository;
         this.userRoleService = userRoleService;
         this.tokenUtil = tokenUtil;
+        this.kekEnvelope = kekEnvelope;
+        this.redissonClient = redissonClient;
     }
 
 
@@ -117,33 +138,76 @@ public class SysUserServiceImpl implements SysUserService {
     }
 
     /**
-     * 获取加密公钥
-     *
-     **/
+     * 返回当前 active 的公钥与 keyId。
+     * 公钥列明文入库、明文返回；私钥列密文入库，此接口完全不触碰。
+     * type=0,status=1 全局唯一（DDL 保证）；status=0 为历史密钥，永久保留供历史数据解密。
+     */
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public ReturnResult getClientRsaPublicKey() throws Exception {
-        //先看数据库是否有最新的公私钥
-        EncryptedRecords latestRecored = encryptedRecordsMapper.selectLatestEncryptedRecord();
-        if (latestRecored != null) {
-            latestRecored.setClientRsaPrivatekey(null);
-            return ReturnResult.OK(latestRecored);
+        EncryptedRecords active = encryptedRecordsMapper.selectLatestEncryptedRecord();
+        if (active == null) {
+            active = createActiveKeyPair();
         }
-        //生成客户端RSA公钥私钥
-        Map<String, String> rsaMap = RSAUtil.genKeyPair();
-        //保存到数据库
-        EncryptedRecords encryptedRecords = new EncryptedRecords();
-        encryptedRecords.setClientRsaPublickey(rsaMap.get("publicKey"));
-        encryptedRecords.setClientRsaPrivatekey(rsaMap.get("privateKey"));
-        Date date = new Date();
-        encryptedRecords.setCreateTime(date);
-        encryptedRecords.setUpdateTime(date);
-        encryptedRecords.setType(0);
-        encryptedRecords.setStatus(1);
-        encryptedRecordsMapper.addEncryptedRecord(encryptedRecords);
-        //不返回客户端私钥
-        encryptedRecords.setClientRsaPrivatekey(null);
-        return ReturnResult.OK(encryptedRecords);
+        ClientRsaPublicKeyVO vo = new ClientRsaPublicKeyVO();
+        vo.setId(active.getId());
+        vo.setClientRsaPublickey(active.getClientRsaPublickey());
+        return ReturnResult.OK(vo);
+    }
+
+    /** 首次生成：并发时靠唯一索引兜底，DuplicateKeyException 后重查已有的 active */
+    private EncryptedRecords createActiveKeyPair() throws Exception {
+        RLock lock = redissonClient.getLock(ACTIVE_RSA_LOCK);
+        boolean locked = false;
+        try {
+            // leaseTime = -1 → 启用 Redisson watchdog 自动续期（与 MDTX 用法一致），
+            // 避免 RSA 生成偶发变慢导致锁提前过期
+            locked = lock.tryLock(LOCK_WAIT_SECONDS, -1, TimeUnit.SECONDS);
+
+            if (!locked) {
+                // 等待超时：持锁方可能刚好完成，再查一次；仍为空则让前端重试
+                EncryptedRecords latest = encryptedRecordsMapper.selectLatestEncryptedRecord();
+                if (latest == null) {
+                    throw new IllegalStateException("active RSA 密钥正在生成中，请稍后重试");
+                }
+                return latest;
+            }
+
+            // 关键：锁内双检，防止前一个加锁请求已经生成过最新的了
+            EncryptedRecords latest = encryptedRecordsMapper.selectLatestEncryptedRecord();
+            if (latest != null) {
+                return latest;
+            }
+
+            Map<String, String> rsaMap = RSAUtil.genKeyPair();
+            Date date = new Date();
+
+            EncryptedRecords record = new EncryptedRecords();
+            record.setClientRsaPublickey(rsaMap.get("publicKey"));                    // 不 seal
+            record.setClientRsaPrivatekey(kekEnvelope.seal(rsaMap.get("privateKey"))); // 只 seal 私钥
+            record.setCreateTime(date);
+            record.setUpdateTime(date);
+            record.setType(0);
+            record.setStatus(1);
+
+            try {
+                encryptedRecordsMapper.addEncryptedRecord(record);
+            } catch (DuplicateKeyException e) {
+                // 最终兜底：锁过期 / Redis 故障 / 有人绕过此接口直接插入时，
+                // 唯一索引仍保证只有一把 active。此时已无外层事务，重查可见。
+                EncryptedRecords existing = encryptedRecordsMapper.selectLatestEncryptedRecord();
+                if (existing == null) throw e;
+                return existing;
+            }
+            return record;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("等待 active RSA 密钥锁被中断", e);
+        } finally {
+            // 必须判断持有者，避免锁超时后误删别人的锁
+            if (locked && lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
     }
 
     @Override
